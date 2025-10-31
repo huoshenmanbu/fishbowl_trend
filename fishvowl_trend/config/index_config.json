@@ -1,0 +1,27 @@
+{
+  "indices": [
+    {"code": "AUUSDO", "name": "伦敦金现"},
+    {"code": "1B0688", "name": "科创50"},
+    {"code": "1B0016", "name": "上证50"},
+    {"code": "883418", "name": "微盘股"},
+    {"code": "399300", "name": "沪深300"},
+    {"code": "399905", "name": "中证500"},
+    {"code": "1B0852", "name": "中证1000"},
+    {"code": "932000", "name": "中证2000"},
+    {"code": "HSCEI00", "name": "国企指数"},
+    {"code": "HSI00001", "name": "恒生指数"},
+    {"code": "399006", "name": "创业板指"},
+    {"code": "899050", "name": "北证50"},
+    {"code": "HST00011", "name": "恒生科技"}
+  ],
+  "ma_period": 20,
+  "update_schedule": {
+    "weekday": "Monday-Friday",
+    "time": "21:30"
+  },
+  "notification": {
+    "wechat_enabled": true,
+    "email_enabled": false
+  }
+}
+
