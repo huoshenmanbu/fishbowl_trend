@@ -4,7 +4,7 @@ module.exports = {
     cwd: "./web",
     script: "../venv/bin/gunicorn",
     args: "server:app -b 127.0.0.1:5000 -w 3",
-    interpreter: "../venv/bin/python",
+    interpreter: "/root/fishbowl_trend/venv/bin/python",
     env: {
       "PYTHONPATH": ".",
       "FLASK_ENV": "production"
