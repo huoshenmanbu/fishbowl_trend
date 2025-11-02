@@ -1,9 +1,13 @@
 from flask import Flask, send_from_directory, jsonify, request
+from werkzeug.middleware.proxy_fix import ProxyFix
 from pathlib import Path
 import json
 import subprocess
 import threading
 import os
+import secrets
+from functools import wraps
+from time import time
 from datetime import datetime
 import pytz
 
@@ -20,7 +24,43 @@ print(f'''
   - DATA_PATH exists: {DATA_PATH.exists()}
 ''')
 
-app = Flask(__name__, static_folder=str(WEB_DIR), template_folder=str(WEB_DIR))
+app = Flask(__name__, static_folder='.')
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)  # 支持代理服务器
+
+# 生成随机密钥
+app.config['SECRET_KEY'] = secrets.token_hex(32)
+
+# 设置安全相关的响应头
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'"
+    return response
+
+# 限制请求频率
+request_history = {}
+def rate_limit(max_requests=10, window=60):  # 每分钟最多10次请求
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            now = time()
+            remote_addr = request.remote_addr
+            
+            # 清理过期的请求记录
+            if remote_addr in request_history:
+                request_history[remote_addr] = [t for t in request_history[remote_addr] if t > now - window]
+            
+            # 检查请求频率
+            if remote_addr in request_history and len(request_history[remote_addr]) >= max_requests:
+                return jsonify({'error': 'Too many requests'}), 429
+            
+            # 记录新请求
+            request_history.setdefault(remote_addr, []).append(now)
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 @app.route('/')
