@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: "fishbowl_trend",
-    cwd: "./fishvowl_trend/web",
+    cwd: "./web",
     script: "../venv/bin/gunicorn",
     args: "server:app -b 127.0.0.1:5000 -w 3",
     interpreter: "../venv/bin/python",
