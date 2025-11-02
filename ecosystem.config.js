@@ -3,7 +3,7 @@ module.exports = {
     name: "fishbowl_trend",
     cwd: "./web",
     script: "../venv/bin/gunicorn",
-    args: "server:app -b 0.0.0.0:5000 -w 3",
+    args: "server:app -b 127.0.0.1:5000 -w 3",
     interpreter: "/root/fishbowl_trend/venv/bin/python",
     env: {
       "PYTHONPATH": ".",
