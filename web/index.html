@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>鱼盆趋势 — 趋势结果</title>
+  <style>
+    /* 基础样式 */
+    :root {
+      --primary-color: #1f8ef1;
+      --success-color: #0f9d58;
+      --error-color: #e53935;
+      --border-color: #edf2f7;
+      --text-muted: #6b7280;
+    }
+    
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+      background: #f6f9fb;
+      color: #222;
+      margin: 0;
+      padding: 10px;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    /* 响应式卡片 */
+    .card {
+      max-width: 1100px;
+      margin: 10px auto;
+      padding: 15px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(20,30,40,0.06);
+    }
+
+    /* 标题和元信息 */
+    h1 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      line-height: 1.4;
+    }
+
+    .meta {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    /* 控制区域 */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .btn {
+      background: var(--primary-color);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 15px;
+      min-height: 44px;
+      touch-action: manipulation;
+    }
+
+    .small {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* 响应式表格 */
+    .table-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin: 0 -15px;
+      padding: 0 15px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    thead th {
+      background: linear-gradient(180deg,#ffffff,#f4f7fb);
+      text-align: left;
+      padding: 12px 8px;
+      border-bottom: 2px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    tbody td {
+      padding: 12px 8px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .yes { color: var(--success-color); font-weight: 700; }
+    .no { color: var(--error-color); font-weight: 700; }
+    .rank { width: 40px; text-align: center; font-weight: 700; }
+    .code { width: 90px; }
+    .muted { color: var(--text-muted); }
+    
+    .highlight {
+      background: linear-gradient(90deg, rgba(255,250,205,0.6), rgba(255,255,255,0));
+    }
+
+    /* Loading 动画 */
+    .loader {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      animation: spin 1s linear infinite;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg) } }
+
+    .note {
+      margin-top: 10px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    /* 移动端优化 */
+    @media (max-width: 768px) {
+      body { padding: 0; }
+      .card { margin: 0; border-radius: 0; }
+      
+      h1 { font-size: 16px; }
+      
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .btn {
+        width: 100%;
+        text-align: center;
+      }
+
+      table { font-size: 13px; }
+      
+      td, th {
+        padding: 8px 6px;
+      }
+
+      /* 隐藏不太重要的列 */
+      .hide-mobile {
+        display: none;
+      }
+    }
+
+    /* 暗色模式支持 */
+    @media (prefers-color-scheme: dark) {
+      body { background: #1a1a1a; color: #e0e0e0; }
+      .card { background: #242424; box-shadow: 0 6px 18px rgba(0,0,0,0.2); }
+      thead th { background: #2a2a2a; border-bottom-color: #333; }
+      tbody td { border-bottom-color: #333; }
+      .highlight { background: linear-gradient(90deg, rgba(255,250,205,0.1), rgba(36,36,36,0)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>鱼盆趋势模型 v2.0 <span class="muted" id="update-time"></span></h1>
+    <div class="meta">数据仅供市场风格趋势分析，不提供投资建议</div>
+
+    <div class="controls">
+      <button id="refreshBtn" class="btn">获取最新趋势 <span id="loadingIcon" class="loader" style="display:none"></span></button>
+      <div id="status" class="small muted"> </div>
+    </div>
+
+    <div class="table-container">
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th class="rank">#</th>
+            <th class="code">代码</th>
+            <th>名称</th>
+            <th>状态</th>
+            <th>涨幅%</th>
+            <th>现价</th>
+            <th>临界点</th>
+            <th>偏离%</th>
+            <th class="hide-mobile">状态转变</th>
+            <th class="hide-mobile">区间%</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- rows injected by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">表格来自本地文件 <code>data/trend_status/latest_trend_result.json</code></div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const tbody = document.querySelector('#resultTable tbody');
+    const updateTimeEl = document.getElementById('update-time');
+
+    // 显示数据的函数
+    async function displayData(data) {
+      if(!data) {
+        statusEl.textContent = '未找到数据文件';
+        return;
+      }
+
+      updateTimeEl.textContent = ' — ' + data.update_time;
+      tbody.innerHTML = '';
+      const rows = data.results || [];
+      rows.sort((a,b)=> (a.rank||0)-(b.rank||0));
+      
+      for(const r of rows){
+        const tr = document.createElement('tr');
+        if(r.status === 'YES') tr.classList.add('highlight');
+
+        tr.innerHTML = `
+          <td class="rank">${r.rank ?? ''}</td>
+          <td class="code">${r.index_code ?? ''}</td>
+          <td>${r.index_name ?? ''}</td>
+          <td class="${r.status==='YES'?'yes':'no'}">${r.status ?? ''}</td>
+          <td>${(r.price_change_pct!=null? r.price_change_pct.toFixed(2): '')}%</td>
+          <td>${(r.current_price!=null? r.current_price: '')}</td>
+          <td>${(r.threshold!=null? r.threshold: '')}</td>
+          <td>${(r.deviation_rate!=null? r.deviation_rate.toFixed(2): '')}%</td>
+          <td>${r.status_change_time || ''}</td>
+          <td>${(r.interval_change_pct!=null? r.interval_change_pct.toFixed(2): '')}%</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // 加载历史数据（不重新计算）
+    async function loadLatest() {
+      try {
+        const res = await fetch('/api/latest');
+        const j = await res.json();
+        if(j.ok && j.data) {
+          // 保存初始更新时间
+          window.initialUpdateTime = j.data.update_time;
+          await displayData(j.data);
+          statusEl.textContent = '最后更新: ' + (j.data.update_time || '');
+        }
+      } catch(err) {
+        statusEl.textContent = '加载历史数据失败: ' + err;
+      }
+    }
+
+    // 获取最新趋势（重新计算）
+    async function loadData(){
+      try {
+        const btn = document.getElementById('refreshBtn');
+        const loadingIcon = document.getElementById('loadingIcon');
+        btn.disabled = true;
+        loadingIcon.style.display = 'inline-block';
+        statusEl.textContent = '正在计算并获取最新趋势...';
+
+        // 开始计算并等待结果
+        const res = await fetch('/api/refresh', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({run: true})
+        });
+        
+        const j = await res.json();
+        if(!j.ok){
+          statusEl.textContent = '错误: ' + (j.error || 'unknown');
+          return;
+        }
+
+        // 如果计算已开始，持续轮询直到有新结果
+        if(j.triggered_run) {
+          let retries = 0;
+          const maxRetries = 60; // 最多等待60次，每次3秒
+          
+          while(retries < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 3000)); // 等待3秒
+            const pollRes = await fetch('/api/latest');
+            const pollData = await pollRes.json();
+            
+            if(pollData.ok && pollData.data) {
+              // 第一次请求时保存初始时间
+              if(!window.initialUpdateTime) {
+                window.initialUpdateTime = pollData.data.update_time;
+              }
+              
+              // 如果更新时间比初始时间新，就认为是新数据
+              if(pollData.data.update_time !== window.initialUpdateTime) {
+                await displayData(pollData.data);
+                statusEl.textContent = '计算完成，数据已更新';
+                return;
+              }
+            }
+            retries++;
+            statusEl.textContent = `计算中，请稍候...（${retries}/${maxRetries}）`;
+          }
+          if(retries >= maxRetries) {
+            statusEl.textContent = '计算超时，请稍后再试';
+            return;
+          }
+        }
+
+        // 如果没有触发计算，显示当前数据
+        if(j.data) {
+          await displayData(j.data);
+          statusEl.textContent = '获取成功';
+        }
+
+        updateTimeEl.textContent = ' — ' + (data.update_time || '未知时间');
+
+        // clear
+        tbody.innerHTML = '';
+        const rows = data.results || [];
+        rows.sort((a,b)=> (a.rank||0)-(b.rank||0));
+        for(const r of rows){
+          const tr = document.createElement('tr');
+          if(r.status === 'YES') tr.classList.add('highlight');
+
+          tr.innerHTML = `
+            <td class="rank">${r.rank ?? ''}</td>
+            <td class="code">${r.index_code ?? ''}</td>
+            <td>${r.index_name ?? ''}</td>
+            <td class="${r.status==='YES'?'yes':'no'}">${r.status ?? ''}</td>
+            <td>${(r.price_change_pct!=null? r.price_change_pct.toFixed(2): '')}%</td>
+            <td>${(r.current_price!=null? r.current_price.toLocaleString(): '')}</td>
+            <td>${(r.threshold!=null? r.threshold.toLocaleString(): '')}</td>
+            <td>${(r.deviation_rate!=null? r.deviation_rate.toFixed(2): '')}%</td>
+            <td class="hide-mobile">${r.status_change_time || ''}</td>
+            <td class="hide-mobile">${(r.interval_change_pct!=null? r.interval_change_pct.toFixed(2): '')}%</td>
+          `;
+          tbody.appendChild(tr);
+        }
+
+        statusEl.textContent = '最后更新: ' + data.update_time + (run? '（如触发计算，正在后台运行）':'');
+      }catch(err){
+        statusEl.textContent = '加载错误: ' + err;
+      }finally{
+        const btn = document.getElementById('refreshBtn');
+        const loadingIcon = document.getElementById('loadingIcon');
+        btn.disabled = false;
+        loadingIcon.style.display = 'none';
+      }
+    }
+
+    // 绑定按钮点击事件
+    document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+    // 页面加载时，只显示历史数据
+    loadLatest();
+  </script>
+</body>
+</html>

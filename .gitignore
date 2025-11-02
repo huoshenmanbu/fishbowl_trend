@@ -20,28 +20,47 @@ wheels/
 .installed.cfg
 *.egg
 
-# Logs
-logs/
-*.log
-
-# Local data
-data/index_quote/*.csv
-data/trend_status/*.json
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Environment
-.env
-.venv
-env/
+# Virtual Environment
 venv/
 ENV/
+env/
 
-# OS
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
-Thumbs.db
-__MACOSX/
+
+# Logs
+logs/*.log
+
+# Data cache
+data/index_quote/*.csv
+data/trend_status/*.json
+data/trend_status/*.txt
+data/trend_status/*.html
+
+# 保留目录结构但忽略内容
+!data/index_quote/.gitkeep
+!data/trend_status/.gitkeep
+!logs/.gitkeep
+
+# Environment variables
+.env
+.env.local
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
