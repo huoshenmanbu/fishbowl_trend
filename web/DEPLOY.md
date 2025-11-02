@@ -1,9 +1,9 @@
-# Ubuntu 服务器部署指南
+# Ubuntu 服务器部署指南 (使用 PM2)
 
 ## 1. 系统要求
 - Ubuntu Server (推荐 20.04 LTS 或更高版本)
 - Python 3.8+ 
-- pip3
+- Node.js 14+ (用于 PM2)
 
 ## 2. 安装步骤
 
@@ -11,10 +11,17 @@
 ```bash
 # 更新系统包
 sudo apt update
-sudo apt upgrade
+sudo apt upgrade -y
 
 # 安装 Python 和相关工具
-sudo apt install python3 python3-pip python3-venv
+sudo apt install -y python3 python3-pip python3-venv
+
+# 安装 Node.js 和 npm
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# 安装 PM2
+sudo npm install -g pm2
 ```
 
 ### 2.2 准备项目
@@ -42,16 +49,33 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2.4 测试运行
-```bash
-# 激活虚拟环境（如果还没激活）
-source .venv/bin/activate
-
-# 运行服务器（测试模式）
-python web/server.py
+### 2.3 配置 PM2
+创建 `ecosystem.config.js` 文件：
+```javascript
+module.exports = {
+  apps: [{
+    name: "fishbowl_trend",
+    cwd: "/home/ubuntu/fishbowl_trend/fishvowl_trend/web",
+    script: "/home/ubuntu/fishbowl_trend/venv/bin/gunicorn",
+    args: "server:app -b 127.0.0.1:5000 -w 3",
+    interpreter: "/home/ubuntu/fishbowl_trend/venv/bin/python",
+    env: {
+      "PYTHONPATH": "/home/ubuntu/fishbowl_trend",
+      "FLASK_ENV": "production"
+    },
+    exec_mode: "fork",
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: "500M",
+    error_file: "/home/ubuntu/fishbowl_trend/logs/err.log",
+    out_file: "/home/ubuntu/fishbowl_trend/logs/out.log",
+    log_date_format: "YYYY-MM-DD HH:mm:ss"
+  }]
+}
 ```
 
-### 2.5 使用 systemd 设置开机自启
+### 2.4 配置 Nginx
 创建服务文件：
 ```bash
 sudo nano /etc/systemd/system/fishbowl.service
