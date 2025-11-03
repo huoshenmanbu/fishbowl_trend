@@ -43,6 +43,19 @@
       margin: 0 0 6px;
       font-size: 18px;
       line-height: 1.4;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    h1 .title-text {
+      flex-shrink: 0;
+    }
+
+    #update-time {
+      font-size: 13px;
+      font-weight: normal;
     }
 
     .meta {
@@ -71,6 +84,23 @@
       font-size: 15px;
       min-height: 44px;
       touch-action: manipulation;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(31, 142, 241, 0.2);
+    }
+
+    .btn:hover {
+      background: #1976d2;
+      box-shadow: 0 4px 8px rgba(31, 142, 241, 0.3);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 1px 2px rgba(31, 142, 241, 0.2);
+    }
+
+    .btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
     }
 
     .small {
@@ -90,30 +120,80 @@
       width: 100%;
       border-collapse: collapse;
       margin-top: 8px;
-      font-size: 14px;
+      font-size: 13px;
     }
 
     thead th {
       background: linear-gradient(180deg,#ffffff,#f4f7fb);
       text-align: left;
-      padding: 12px 8px;
+      padding: 10px 6px;
       border-bottom: 2px solid var(--border-color);
+      border-right: 1px solid #e5e7eb;
       white-space: nowrap;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    thead th:last-child {
+      border-right: none;
     }
 
     tbody td {
-      padding: 12px 8px;
+      padding: 10px 6px;
       border-bottom: 1px solid #f1f5f9;
+      border-right: 1px solid #f1f5f9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .yes { color: var(--success-color); font-weight: 700; }
-    .no { color: var(--error-color); font-weight: 700; }
-    .rank { width: 40px; text-align: center; font-weight: 700; }
-    .code { width: 90px; }
+    tbody td:last-child {
+      border-right: none;
+    }
+
+    .yes { 
+      color: var(--success-color); 
+      font-weight: 700;
+    }
+    .yes::before {
+      content: '✓ ';
+      font-size: 14px;
+    }
+    .no { 
+      color: var(--error-color); 
+      font-weight: 700;
+    }
+    .rank { 
+      width: 30px; 
+      text-align: center; 
+      font-weight: 700;
+      color: #6b7280;
+    }
+    .code { 
+      width: 80px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+    .name {
+      max-width: 70px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .muted { color: var(--text-muted); }
     
     .highlight {
-      background: linear-gradient(90deg, rgba(255,250,205,0.6), rgba(255,255,255,0));
+      background: linear-gradient(90deg, rgba(255,250,205,0.7), rgba(255,255,255,0));
+    }
+    
+    .highlight td:first-child {
+      border-left: 3px solid var(--success-color);
+    }
+
+    /* 数字列右对齐 */
+    .num-col {
+      text-align: right;
+      font-family: 'Courier New', monospace;
     }
 
     /* Loading 动画 */
@@ -140,29 +220,106 @@
     /* 移动端优化 */
     @media (max-width: 768px) {
       body { padding: 0; }
-      .card { margin: 0; border-radius: 0; }
+      .card { 
+        margin: 0; 
+        border-radius: 0;
+        padding: 12px;
+      }
       
-      h1 { font-size: 16px; }
+      h1 { 
+        font-size: 14px;
+        margin-bottom: 4px;
+        gap: 4px;
+      }
+
+      h1 .title-text {
+        font-size: 14px;
+      }
+
+      #update-time {
+        font-size: 11px;
+        display: block;
+        width: 100%;
+        margin-top: 2px;
+      }
+
+      .meta {
+        font-size: 11px;
+        margin-bottom: 8px;
+      }
       
       .controls {
         flex-direction: column;
         align-items: stretch;
+        gap: 8px;
+        margin-bottom: 10px;
       }
       
       .btn {
         width: 100%;
         text-align: center;
+        padding: 12px 16px;
+        font-size: 14px;
       }
 
-      table { font-size: 13px; }
+      .small {
+        font-size: 12px;
+      }
+
+      .table-container {
+        margin: 0 -12px;
+        padding: 0;
+      }
+
+      table { 
+        font-size: 11px;
+        table-layout: fixed;
+      }
       
-      td, th {
-        padding: 8px 6px;
+      thead th {
+        padding: 8px 4px;
+        font-size: 11px;
+        position: sticky;
+        top: 0;
+        background: #fff;
+        z-index: 10;
+      }
+
+      tbody td {
+        padding: 8px 4px;
+      }
+
+      /* 列宽优化 */
+      .rank { width: 25px; font-size: 10px; }
+      .code { width: 65px; font-size: 10px; }
+      .name { 
+        max-width: 55px;
+        font-size: 11px;
+      }
+      
+      /* 数字列 */
+      .num-col {
+        font-size: 11px;
       }
 
       /* 隐藏不太重要的列 */
       .hide-mobile {
         display: none;
+      }
+
+      .note {
+        font-size: 11px;
+        margin-top: 8px;
+        padding: 0 4px;
+      }
+
+      /* 状态标记更醒目 */
+      .yes, .no {
+        font-size: 12px;
+      }
+      
+      .yes::before {
+        font-size: 13px;
       }
     }
 
@@ -170,15 +327,27 @@
     @media (prefers-color-scheme: dark) {
       body { background: #1a1a1a; color: #e0e0e0; }
       .card { background: #242424; box-shadow: 0 6px 18px rgba(0,0,0,0.2); }
-      thead th { background: #2a2a2a; border-bottom-color: #333; }
-      tbody td { border-bottom-color: #333; }
-      .highlight { background: linear-gradient(90deg, rgba(255,250,205,0.1), rgba(36,36,36,0)); }
+      thead th { 
+        background: #2a2a2a; 
+        border-bottom-color: #333;
+        border-right-color: #333;
+      }
+      tbody td { 
+        border-bottom-color: #333;
+        border-right-color: #333;
+      }
+      .highlight { 
+        background: linear-gradient(90deg, rgba(255,250,205,0.15), rgba(36,36,36,0)); 
+      }
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>鱼盆趋势模型 v2.0 <span class="muted" id="update-time"></span></h1>
+    <h1>
+      <span class="title-text">鱼盆趋势模型 v2.0</span>
+      <span class="muted" id="update-time"></span>
+    </h1>
     <div class="meta">数据仅供市场风格趋势分析，不提供投资建议</div>
 
     <div class="controls">
@@ -192,14 +361,14 @@
           <tr>
             <th class="rank">#</th>
             <th class="code">代码</th>
-            <th>名称</th>
+            <th class="name">名称</th>
             <th>状态</th>
-            <th>涨幅%</th>
-            <th>现价</th>
-            <th>临界点</th>
-            <th>偏离%</th>
+            <th class="num-col">涨幅%</th>
+            <th class="num-col">现价</th>
+            <th class="num-col">临界点</th>
+            <th class="num-col">偏离%</th>
             <th class="hide-mobile">状态转变</th>
-            <th class="hide-mobile">区间%</th>
+            <th class="hide-mobile num-col">区间%</th>
           </tr>
         </thead>
         <tbody>
@@ -223,7 +392,11 @@
         return;
       }
 
-      updateTimeEl.textContent = ' — ' + data.update_time;
+      // 格式化更新时间显示
+      const updateTime = data.update_time || '';
+      const timeMatch = updateTime.match(/\d{2}:\d{2}:\d{2}/);
+      const timeStr = timeMatch ? timeMatch[0] : updateTime;
+      updateTimeEl.textContent = timeStr ? ` — ${timeStr}` : '';
       tbody.innerHTML = '';
       const rows = data.results || [];
       rows.sort((a,b)=> (a.rank||0)-(b.rank||0));
@@ -235,14 +408,14 @@
         tr.innerHTML = `
           <td class="rank">${r.rank ?? ''}</td>
           <td class="code">${r.index_code ?? ''}</td>
-          <td>${r.index_name ?? ''}</td>
+          <td class="name" title="${r.index_name ?? ''}">${r.index_name ?? ''}</td>
           <td class="${r.status==='YES'?'yes':'no'}">${r.status ?? ''}</td>
-          <td>${(r.price_change_pct!=null? r.price_change_pct.toFixed(2): '')}%</td>
-          <td>${(r.current_price!=null? r.current_price: '')}</td>
-          <td>${(r.threshold!=null? r.threshold: '')}</td>
-          <td>${(r.deviation_rate!=null? r.deviation_rate.toFixed(2): '')}%</td>
-          <td>${r.status_change_time || ''}</td>
-          <td>${(r.interval_change_pct!=null? r.interval_change_pct.toFixed(2): '')}%</td>
+          <td class="num-col">${(r.price_change_pct!=null? r.price_change_pct.toFixed(2): '')}%</td>
+          <td class="num-col">${(r.current_price!=null? r.current_price.toFixed(2): '')}</td>
+          <td class="num-col">${(r.threshold!=null? r.threshold.toFixed(2): '')}</td>
+          <td class="num-col">${(r.deviation_rate!=null? r.deviation_rate.toFixed(2): '')}%</td>
+          <td class="hide-mobile">${r.status_change_time || ''}</td>
+          <td class="hide-mobile num-col">${(r.interval_change_pct!=null? r.interval_change_pct.toFixed(2): '')}%</td>
         `;
         tbody.appendChild(tr);
       }
