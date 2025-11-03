@@ -273,6 +273,11 @@
         loadingIcon.style.display = 'inline-block';
         statusEl.textContent = '正在计算并获取最新趋势...';
 
+        // 记录点击时的当前数据更新时间
+        const currentRes = await fetch('/api/latest');
+        const currentData = await currentRes.json();
+        const currentUpdateTime = currentData.ok && currentData.data ? currentData.data.update_time : null;
+
         // 开始计算并等待结果
         const res = await fetch('/api/refresh', {
           method: 'POST',
@@ -289,7 +294,7 @@
         // 如果计算已开始，持续轮询直到有新结果
         if(j.triggered_run) {
           let retries = 0;
-          const maxRetries = 60; // 最多等待60次，每次3秒
+          const maxRetries = 40; // 最多等待40次，每次3秒 = 2分钟
           
           while(retries < maxRetries) {
             await new Promise(resolve => setTimeout(resolve, 3000)); // 等待3秒
@@ -297,59 +302,34 @@
             const pollData = await pollRes.json();
             
             if(pollData.ok && pollData.data) {
-              // 第一次请求时保存初始时间
-              if(!window.initialUpdateTime) {
-                window.initialUpdateTime = pollData.data.update_time;
-              }
-              
-              // 如果更新时间比初始时间新，就认为是新数据
-              if(pollData.data.update_time !== window.initialUpdateTime) {
+              // 如果更新时间比点击时的时间新，就认为是新数据
+              if(pollData.data.update_time !== currentUpdateTime) {
                 await displayData(pollData.data);
-                statusEl.textContent = '计算完成，数据已更新';
+                statusEl.textContent = '✓ 计算完成，数据已更新';
                 return;
               }
             }
             retries++;
-            statusEl.textContent = `计算中，请稍候...（${retries}/${maxRetries}）`;
+            statusEl.textContent = `计算中，请稍候... (${retries}/${maxRetries})`;
           }
-          if(retries >= maxRetries) {
+          
+          // 超时后仍显示最新数据
+          const finalRes = await fetch('/api/latest');
+          const finalData = await finalRes.json();
+          if(finalData.ok && finalData.data) {
+            await displayData(finalData.data);
+            statusEl.textContent = '计算可能仍在进行，已显示当前数据';
+          } else {
             statusEl.textContent = '计算超时，请稍后再试';
-            return;
           }
+          return;
         }
 
         // 如果没有触发计算，显示当前数据
         if(j.data) {
           await displayData(j.data);
-          statusEl.textContent = '获取成功';
+          statusEl.textContent = '✓ 获取成功';
         }
-
-        updateTimeEl.textContent = ' — ' + (data.update_time || '未知时间');
-
-        // clear
-        tbody.innerHTML = '';
-        const rows = data.results || [];
-        rows.sort((a,b)=> (a.rank||0)-(b.rank||0));
-        for(const r of rows){
-          const tr = document.createElement('tr');
-          if(r.status === 'YES') tr.classList.add('highlight');
-
-          tr.innerHTML = `
-            <td class="rank">${r.rank ?? ''}</td>
-            <td class="code">${r.index_code ?? ''}</td>
-            <td>${r.index_name ?? ''}</td>
-            <td class="${r.status==='YES'?'yes':'no'}">${r.status ?? ''}</td>
-            <td>${(r.price_change_pct!=null? r.price_change_pct.toFixed(2): '')}%</td>
-            <td>${(r.current_price!=null? r.current_price.toLocaleString(): '')}</td>
-            <td>${(r.threshold!=null? r.threshold.toLocaleString(): '')}</td>
-            <td>${(r.deviation_rate!=null? r.deviation_rate.toFixed(2): '')}%</td>
-            <td class="hide-mobile">${r.status_change_time || ''}</td>
-            <td class="hide-mobile">${(r.interval_change_pct!=null? r.interval_change_pct.toFixed(2): '')}%</td>
-          `;
-          tbody.appendChild(tr);
-        }
-
-        statusEl.textContent = '最后更新: ' + data.update_time + (run? '（如触发计算，正在后台运行）':'');
       }catch(err){
         statusEl.textContent = '加载错误: ' + err;
       }finally{
