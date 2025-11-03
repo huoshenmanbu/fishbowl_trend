@@ -15,8 +15,13 @@
       --red-text: #f44336;
       --green-text: #00b050;
       --blue-link: #0066cc;
-      --yellow-bg: #fff9e6;
+      --yellow-bg: #fffbe6; /* Softer yellow for highlight */
       --gray-bg: #f8f9fa;
+      --header-bg-start: #e0e7ef; /* Lighter blue-gray for header */
+      --header-bg-end: #cdd7e5; /* Darker blue-gray for header */
+      --yes-color: #e53935; /* Brighter red for YES */
+      --no-color: #757575; /* Slightly lighter gray for NO */
+      --name-color: #3f51b5; /* A more subtle blue for names */
     }
     
     * {
@@ -130,7 +135,7 @@
     }
 
     thead th {
-      background: linear-gradient(180deg, #e8eef5, #d4dce8);
+      background: linear-gradient(180deg, var(--header-bg-start), var(--header-bg-end));
       text-align: center;
       padding: 10px 6px;
       border: 1px solid var(--border-color);
@@ -159,11 +164,11 @@
     }
 
     .yes { 
-      color: #d32f2f;
+      color: var(--yes-color);
       font-weight: 700;
     }
     .no { 
-      color: #666;
+      color: var(--no-color);
       font-weight: 700;
     }
     .rank { 
@@ -184,7 +189,7 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      color: var(--blue-link);
+      color: var(--name-color); /* Use the new subtle blue */
       font-weight: 500;
     }
     .muted { color: var(--text-muted); }

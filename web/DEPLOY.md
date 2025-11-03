@@ -55,9 +55,9 @@ pip install -r requirements.txt
 module.exports = {
   apps: [{
     name: "fishbowl_trend",
-    cwd: "/home/ubuntu/fishbowl_trend/web",
+    cwd: "/home/ubuntu/fishbowl_trend/fishvowl_trend/web",
     script: "/home/ubuntu/fishbowl_trend/venv/bin/gunicorn",
-    args: "server:app -b 0.0.0.0:5000 -w 3",
+    args: "server:app -b 127.0.0.1:5000 -w 3",
     interpreter: "/home/ubuntu/fishbowl_trend/venv/bin/python",
     env: {
       "PYTHONPATH": "/home/ubuntu/fishbowl_trend",
@@ -107,73 +107,34 @@ sudo systemctl enable fishbowl
 sudo systemctl start fishbowl
 ```
 
-### 2.4 启动 PM2
+### 2.6 配置 Nginx（可选，推荐）
 ```bash
-cd /root/fishbowl_trend  # 进入项目根目录
-pm2 start ecosystem.config.js
-pm2 save
-pm2 startup  # 设置开机自启
+sudo apt install nginx
 
-# 查看运行状态
-pm2 status
-pm2 logs fishbowl_trend
-```
-
-### 2.5 配置 Nginx（必需，用于反向代理）
-```bash
-# 安装 Nginx
-sudo apt install -y nginx
-
-# 复制配置文件到 Nginx 目录
-sudo cp /root/fishbowl_trend/web/nginx.conf /etc/nginx/sites-available/fishbowl
-
-# 或者手动创建配置
+# 创建 Nginx 配置
 sudo nano /etc/nginx/sites-available/fishbowl
 ```
 
-写入以下配置（项目中已提供 `web/nginx.conf` 文件）：
+写入以下配置：
 ```nginx
 server {
     listen 80;
-    server_name _;  # 接受任何域名/IP访问，或改为你的域名
+    server_name your-domain-or-ip;
 
-    # 访问日志
-    access_log /var/log/nginx/fishbowl_access.log;
-    error_log /var/log/nginx/fishbowl_error.log;
-
-    # 客户端请求体大小限制
-    client_max_body_size 10M;
-
-    # 代理到本地Flask应用
     location / {
         proxy_pass http://127.0.0.1:5000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # 超时设置
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
     }
 }
 ```
 
-启用站点并重启 Nginx：
+启用站点：
 ```bash
-# 启用站点
 sudo ln -s /etc/nginx/sites-available/fishbowl /etc/nginx/sites-enabled/
-
-# 删除默认站点（可选）
-sudo rm /etc/nginx/sites-enabled/default
-
-# 测试配置
 sudo nginx -t
-
-# 重启 Nginx
 sudo systemctl restart nginx
-sudo systemctl enable nginx
 ```
 
 ### 2.7 配置防火墙（如果启用了防火墙）
@@ -217,151 +178,17 @@ crontab -e
 
 ## 4. 常见问题排查
 
-### 4.1 访问服务器IP出现404错误
-
-**检查清单：**
-
-1. **检查 PM2 服务是否运行**
+### 4.1 服务无法启动
+检查日志：
 ```bash
-pm2 status
-# 应该看到 fishbowl_trend 状态为 online
-
-# 查看详细日志
-pm2 logs fishbowl_trend --lines 50
+sudo journalctl -u fishbowl -n 50
 ```
 
-2. **检查 gunicorn 是否正确监听 5000 端口**
+### 4.2 无法访问网页
+- 检查防火墙设置
+- 检查 Nginx 配置和日志
+- 确认 Flask 服务正在运行
 ```bash
-netstat -tlnp | grep 5000
-# 应该显示: tcp  0  0  127.0.0.1:5000  0.0.0.0:*  LISTEN
-
-# 或使用 ss 命令
-ss -tlnp | grep 5000
-```
-
-3. **检查 Nginx 是否正在运行**
-```bash
-sudo systemctl status nginx
-# 应该显示 active (running)
-
-# 如果未运行，启动它
-sudo systemctl start nginx
-```
-
-4. **检查 Nginx 配置是否正确**
-```bash
-# 测试配置文件语法
-sudo nginx -t
-
-# 查看已启用的站点
-ls -la /etc/nginx/sites-enabled/
-
-# 检查配置内容
-cat /etc/nginx/sites-available/fishbowl
-```
-
-5. **查看 Nginx 日志**
-```bash
-# 查看错误日志
-sudo tail -f /var/log/nginx/fishbowl_error.log
-sudo tail -f /var/log/nginx/error.log
-
-# 查看访问日志
-sudo tail -f /var/log/nginx/fishbowl_access.log
-sudo tail -f /var/log/nginx/access.log
-```
-
-6. **测试本地连接**
-```bash
-# 在服务器上测试 Flask 应用是否响应
-curl http://127.0.0.1:5000/
-
-# 测试 Nginx 代理
-curl http://127.0.0.1/
-```
-
-7. **检查防火墙设置**
-```bash
-# 查看 UFW 状态
-sudo ufw status
-
-# 确保80端口开放
-sudo ufw allow 80/tcp
-
-# 查看 iptables 规则
-sudo iptables -L -n
-```
-
-8. **重启所有服务**
-```bash
-# 重启 PM2 应用
-pm2 restart fishbowl_trend
-
-# 重启 Nginx
-sudo systemctl restart nginx
-
-# 查看状态
-pm2 status
-sudo systemctl status nginx
-```
-
-### 4.2 Nginx 常见错误修复
-
-**错误：502 Bad Gateway**
-- 原因：Nginx 无法连接到后端服务（gunicorn）
-- 解决：
-```bash
-# 确认 gunicorn 正在运行
-pm2 status
-pm2 logs fishbowl_trend
-
-# 检查端口
-netstat -tlnp | grep 5000
-```
-
-**错误：403 Forbidden**
-- 原因：权限问题或目录不存在
-- 解决：
-```bash
-# 检查文件权限
-ls -la /root/fishbowl_trend/web/
-
-# 检查 Nginx 用户权限
-ps aux | grep nginx
-```
-
-**错误：配置文件未生效**
-```bash
-# 删除旧的符号链接
-sudo rm /etc/nginx/sites-enabled/fishbowl
-
-# 重新创建
-sudo ln -s /etc/nginx/sites-available/fishbowl /etc/nginx/sites-enabled/
-
-# 测试并重启
-sudo nginx -t
-sudo systemctl restart nginx
-```
-
-### 4.3 完整的诊断命令集
-```bash
-# 一键诊断脚本
-echo "=== PM2 状态 ==="
-pm2 status
-
-echo -e "\n=== 端口监听情况 ==="
-netstat -tlnp | grep -E "5000|80"
-
-echo -e "\n=== Nginx 状态 ==="
-sudo systemctl status nginx
-
-echo -e "\n=== Nginx 配置测试 ==="
-sudo nginx -t
-
-echo -e "\n=== 防火墙状态 ==="
-sudo ufw status
-
-echo -e "\n=== 最近的错误日志 ==="
-pm2 logs fishbowl_trend --lines 20 --nostream
-sudo tail -20 /var/log/nginx/error.log
+ps aux | grep python
+netstat -tlpn | grep 5000
 ```
