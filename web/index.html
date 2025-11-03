@@ -148,9 +148,11 @@
     tbody td {
       padding: 8px 6px;
       border: 1px solid var(--border-color);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      /* Removed truncation for full content display */
+      white-space: normal; 
+      overflow: visible;
+      text-overflow: clip;
+      text-align: left; /* Left-align all columns */
     }
 
     /* 斑马纹 - 偶数行 */
@@ -185,10 +187,11 @@
       text-align: center;
     }
     .name {
-      max-width: 70px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      /* Removed max-width and truncation for full content display */
+      /* max-width: 70px; */
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
       color: var(--name-color); /* Use the new subtle blue */
       font-weight: 500;
     }
@@ -212,16 +215,15 @@
       color: #666;
     }
 
-    /* 数字列右对齐 */
+    /* 数字列和状态列现在也左对齐 */
     .num-col {
-      text-align: right;
+      text-align: left;
       font-family: 'Courier New', monospace;
-      padding-right: 10px !important;
+      padding-right: 6px !important; /* Adjust padding for left alignment */
     }
 
-    /* 状态列居中 */
     .status-col {
-      text-align: center;
+      text-align: left;
       font-weight: 700;
     }
 
@@ -312,6 +314,7 @@
         top: 0;
         background: #fff;
         z-index: 10;
+        text-align: left; /* Ensure mobile headers are also left-aligned */
       }
 
       tbody td {
@@ -320,29 +323,37 @@
 
       /* 列宽优化 */
       .rank { 
-        width: 28px; 
+        width: auto; /* Allow width to adjust */
         font-size: 10px;
-        padding: 6px 2px !important;
+        padding: 6px 4px !important; /* Adjust padding for left alignment */
+        text-align: left;
       }
       .code { 
-        width: 65px; 
+        width: auto; /* Allow width to adjust */
         font-size: 10px;
+        text-align: left;
       }
       .name { 
-        max-width: 55px;
+        max-width: none; /* Remove max-width for full display */
         font-size: 11px;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        text-align: left;
       }
       
       /* 数字列 */
       .num-col {
         font-size: 10px;
         padding: 6px 4px !important;
+        text-align: left;
       }
 
       /* 状态列 */
       .status-col {
         font-size: 11px;
         padding: 6px 4px !important;
+        text-align: left;
       }
 
       /* 隐藏不太重要的列 */
@@ -412,7 +423,7 @@
       <table id="resultTable">
         <thead>
           <tr>
-            <th>趋势强度</th>
+            <th>排名</th>
             <th>代码</th>
             <th>名称</th>
             <th>状态</th>
