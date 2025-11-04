@@ -12,9 +12,7 @@
     {"code": "HSI00001", "name": "恒生指数"},
     {"code": "399006", "name": "创业板指"},
     {"code": "899050", "name": "北证50"},
-    {"code": "HST00011", "name": "恒生科技"},
-    {"code": "399986", "name": "中证银行"}
-
+    {"code": "HST00011", "name": "恒生科技"}
   ],
   "ma_period": 20,
   "update_schedule": {
