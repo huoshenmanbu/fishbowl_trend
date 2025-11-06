@@ -143,7 +143,7 @@ class IndexTrendAnalyzer:
             # 更新历史状态
             self.history_status[index_code] = {
                 'status': current_status,
-                'status_change_time': status_change_time if status_change_time else datetime.now().strftime('%Y.%-m.%-d'),
+                'status_change_time': status_change_time if status_change_time else datetime.now().strftime('%Y.%m.%d').replace('.0', '.'),
                 'status_change_price': status_change_price
             }
             

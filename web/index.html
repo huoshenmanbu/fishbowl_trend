@@ -298,62 +298,68 @@
       }
 
       .table-container {
-        margin: 0 -12px;
-        padding: 0;
+        margin: 0 -5px;
+        padding: 0 5px;
       }
 
       table { 
-        font-size: 11px;
+        font-size: 8px; /* Further reduced font size for table content */
         table-layout: fixed;
+        width: 100%;
+        min-width: 280px; /* Further reduced minimum width */
       }
       
       thead th {
-        padding: 8px 4px;
-        font-size: 11px;
+        padding: 4px 1px; /* Further reduced padding */
+        font-size: 8px; /* Further reduced font size for headers */
         position: sticky;
         top: 0;
         background: #fff;
         z-index: 10;
-        text-align: left; /* Ensure mobile headers are also left-aligned */
+        text-align: left;
       }
 
       tbody td {
-        padding: 8px 4px;
+        padding: 4px 1px; /* Further reduced padding */
+        word-break: break-word;
       }
 
       /* 列宽优化 */
       .rank { 
-        width: auto; /* Allow width to adjust */
-        font-size: 10px;
-        padding: 6px 4px !important; /* Adjust padding for left alignment */
+        width: 8%;
+        font-size: 7px; /* Further reduced font size */
+        padding: 3px 1px !important;
         text-align: left;
       }
       .code { 
-        width: auto; /* Allow width to adjust */
-        font-size: 10px;
+        width: 15%;
+        font-size: 7px; /* Further reduced font size */
         text-align: left;
       }
       .name { 
-        max-width: none; /* Remove max-width for full display */
-        font-size: 11px;
+        width: 25%;
+        max-width: 25%;
+        font-size: 8px; /* Further reduced font size */
         white-space: normal;
-        overflow: visible;
-        text-overflow: clip;
+        overflow: hidden;
+        text-overflow: ellipsis;
         text-align: left;
       }
       
       /* 数字列 */
       .num-col {
-        font-size: 10px;
-        padding: 6px 4px !important;
+        font-size: 7px; /* Further reduced font size */
+        padding: 3px 1px !important;
         text-align: left;
+        width: 17%;
       }
 
       /* 状态列 */
       .status-col {
-        font-size: 11px;
-        padding: 6px 4px !important;
+        font-size: 8px; /* Further reduced font size */
+        padding: 3px 1px !important;
         text-align: left;
+        width: 10%;
       }
 
       /* 隐藏不太重要的列 */
