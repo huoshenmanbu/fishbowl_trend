@@ -182,7 +182,7 @@ class TrendReporter:
             font-weight: bold;
         }}
         .status-no {{
-            color: #757575 !important;
+            color: #00b050 !important;
             font-weight: bold;
         }}
         .positive {{

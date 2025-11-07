@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light only">
+    <title>颜色测试 - 鱼盆趋势模型</title>
+    <style>
+        body {
+            font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+            background: #f6f9fb !important;
+            color: #222 !important;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .test-section {
+            background: #fff;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .color-demo {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .yes { 
+            color: #e53935 !important;
+            font-weight: 700;
+        }
+        .no { 
+            color: #00b050 !important;
+            font-weight: 700;
+        }
+
+        .price-up {
+            color: #e53935 !important;
+            font-weight: 600;
+        }
+        .price-down {
+            color: #00b050 !important;
+            font-weight: 600;
+        }
+        .price-zero {
+            color: #666;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background: linear-gradient(180deg, #e0e7ef, #cdd7e5);
+            color: #333;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background: #fafbfc;
+        }
+
+        .highlight {
+            background: #fffbe6 !important;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 鱼盆趋势模型 - 颜色测试页面</h1>
+
+    <div class="test-section">
+        <h2>📊 状态颜色测试</h2>
+        <div class="color-demo">
+            <span>YES状态:</span>
+            <span class="yes">YES</span>
+            <span style="color: #666;">(红色 - 中国股市习惯，表示上涨/看涨)</span>
+        </div>
+        <div class="color-demo">
+            <span>NO状态:</span>
+            <span class="no">NO</span>
+            <span style="color: #666;">(绿色 - 中国股市习惯，表示下跌/看跌)</span>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📈 涨跌幅颜色测试</h2>
+        <div class="color-demo">
+            <span>正涨幅:</span>
+            <span class="price-up">+2.45%</span>
+            <span style="color: #666;">(红色 - 上涨)</span>
+        </div>
+        <div class="color-demo">
+            <span>负涨幅:</span>
+            <span class="price-down">-1.23%</span>
+            <span style="color: #666;">(绿色 - 下跌)</span>
+        </div>
+        <div class="color-demo">
+            <span>零涨幅:</span>
+            <span class="price-zero">0.00%</span>
+            <span style="color: #666;">(灰色 - 平盘)</span>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 表格颜色测试</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>代码</th>
+                    <th>名称</th>
+                    <th>状态</th>
+                    <th>涨幅%</th>
+                    <th>说明</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="highlight">
+                    <td>1</td>
+                    <td>159857</td>
+                    <td>光伏ETF</td>
+                    <td class="yes">YES</td>
+                    <td class="price-up">+10.53%</td>
+                    <td>YES红色，正涨幅红色 ✅</td>
+                </tr>
+                <tr class="highlight">
+                    <td>2</td>
+                    <td>399808</td>
+                    <td>中证新能</td>
+                    <td class="yes">YES</td>
+                    <td class="price-down">-0.25%</td>
+                    <td>YES红色，负涨幅绿色 ✅</td>
+                </tr>
+                <tr>
+                    <td>15</td>
+                    <td>HST00011</td>
+                    <td>恒生科技</td>
+                    <td class="no">NO</td>
+                    <td class="price-up">+2.42%</td>
+                    <td>NO绿色，正涨幅红色 ✅</td>
+                </tr>
+                <tr>
+                    <td>16</td>
+                    <td>AUUSDO</td>
+                    <td>伦敦金现</td>
+                    <td class="no">NO</td>
+                    <td class="price-down">-2.13%</td>
+                    <td>NO绿色，负涨幅绿色 ✅</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="test-section">
+        <h2>✅ 颜色规则总结</h2>
+        <ul>
+            <li><strong>YES状态</strong>: <span class="yes">红色 (#e53935)</span> - 趋势向上</li>
+            <li><strong>NO状态</strong>: <span class="no">绿色 (#00b050)</span> - 趋势向下</li>
+            <li><strong>正涨幅</strong>: <span class="price-up">红色 (#e53935)</span> - 价格上涨</li>
+            <li><strong>负涨幅</strong>: <span class="price-down">绿色 (#00b050)</span> - 价格下跌</li>
+            <li><strong>零涨幅</strong>: <span class="price-zero">灰色 (#666)</span> - 价格平盘</li>
+        </ul>
+        <p style="color: #666; font-size: 14px; margin-top: 20px;">
+            ✅ 符合中国股市颜色习惯：红涨绿跌
+        </p>
+    </div>
+</body>
+</html>
