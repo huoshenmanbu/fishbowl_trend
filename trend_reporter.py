@@ -187,9 +187,11 @@ class TrendReporter:
         }}
         .positive {{
             color: #f44336 !important;
+            font-weight: 700 !important;
         }}
         .negative {{
             color: #00b050 !important;
+            font-weight: 700 !important;
         }}
         .rank {{
             font-weight: bold;
