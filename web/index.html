@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="light only" />
   <title>鱼盆趋势 — 趋势结果</title>
   <style>
     /* 基础样式 */
@@ -382,7 +383,9 @@
       }
     }
 
-    /* 暗色模式支持 */
+    /* 强制浅色模式 - 禁用暗色模式 */
+    /* 注释掉暗色模式，确保所有设备都使用浅色主题 */
+    /*
     @media (prefers-color-scheme: dark) {
       body { background: #1a1a1a; color: #e0e0e0; }
       .card { background: #242424; box-shadow: 0 6px 18px rgba(0,0,0,0.2); }
@@ -409,6 +412,54 @@
       .name {
         color: #4da6ff;
       }
+    }
+    */
+    
+    /* 强制浅色模式样式 */
+    body { 
+      background: #f6f9fb !important; 
+      color: #222 !important; 
+    }
+    
+    .card { 
+      background: #fff !important; 
+      box-shadow: 0 6px 18px rgba(20,30,40,0.06) !important; 
+    }
+    
+    thead th { 
+      background: linear-gradient(180deg, var(--header-bg-start), var(--header-bg-end)) !important;
+      border-color: var(--border-color) !important;
+      color: #333 !important;
+    }
+    
+    tbody td { 
+      border-color: var(--border-color) !important;
+      color: #222 !important;
+    }
+    
+    tbody tr:nth-child(even) {
+      background: #fafbfc !important;
+    }
+    
+    tbody tr:hover {
+      background: #f0f7ff !important;
+    }
+    
+    .highlight { 
+      background: var(--yellow-bg) !important;
+    }
+    
+    .rank {
+      background: var(--gray-bg) !important;
+      color: #333 !important;
+    }
+    
+    .name {
+      color: var(--name-color) !important;
+    }
+    
+    .muted { 
+      color: var(--text-muted) !important; 
     }
   </style>
 </head>

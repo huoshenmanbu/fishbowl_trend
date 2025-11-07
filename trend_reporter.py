@@ -129,12 +129,15 @@ class TrendReporter:
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light only">
     <title>{title}</title>
     <style>
         body {{
-            font-family: Arial, sans-serif;
+            font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
             margin: 20px;
-            background-color: #f5f5f5;
+            background-color: #f6f9fb !important;
+            color: #222 !important;
         }}
         .header {{
             text-align: center;
@@ -142,48 +145,73 @@ class TrendReporter:
         }}
         .header h1 {{
             margin: 10px 0;
+            color: #222 !important;
         }}
         .header p {{
-            color: #666;
+            color: #666 !important;
             margin: 5px 0;
         }}
         table {{
             width: 100%;
             border-collapse: collapse;
-            background-color: white;
+            background-color: white !important;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #d1d5db;
         }}
         th {{
-            background-color: #4CAF50;
-            color: white;
+            background: linear-gradient(180deg, #e0e7ef, #cdd7e5) !important;
+            color: #333 !important;
             padding: 12px;
             text-align: left;
             font-weight: bold;
+            border: 1px solid #d1d5db;
         }}
         td {{
             padding: 10px 12px;
-            border-bottom: 1px solid #ddd;
+            border: 1px solid #d1d5db;
+            color: #222 !important;
+        }}
+        tr:nth-child(even) {{
+            background-color: #fafbfc !important;
         }}
         tr:hover {{
-            background-color: #f5f5f5;
+            background-color: #f0f7ff !important;
         }}
         .status-yes {{
-            color: #4CAF50;
+            color: #e53935 !important;
             font-weight: bold;
         }}
         .status-no {{
-            color: #f44336;
+            color: #757575 !important;
             font-weight: bold;
         }}
         .positive {{
-            color: #4CAF50;
+            color: #f44336 !important;
         }}
         .negative {{
-            color: #f44336;
+            color: #00b050 !important;
         }}
         .rank {{
             font-weight: bold;
-            color: #2196F3;
+            color: #333 !important;
+            background: #f8f9fa !important;
+        }}
+        
+        /* 移动端优化 */
+        @media (max-width: 768px) {{
+            body {{
+                margin: 10px;
+                font-size: 14px;
+            }}
+            table {{
+                font-size: 12px;
+            }}
+            th, td {{
+                padding: 8px 4px;
+            }}
+            .header h1 {{
+                font-size: 18px;
+            }}
         }}
     </style>
 </head>

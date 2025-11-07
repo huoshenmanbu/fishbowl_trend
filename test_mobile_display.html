@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light only">
+    <title>移动端显示测试 - 鱼盆趋势模型</title>
+    <style>
+        /* 强制浅色模式 */
+        body {
+            font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+            background: #f6f9fb !important;
+            color: #222 !important;
+            margin: 0;
+            padding: 10px;
+        }
+
+        .card {
+            max-width: 1100px;
+            margin: 10px auto;
+            padding: 15px;
+            background: #fff !important;
+            border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(20,30,40,0.06);
+        }
+
+        h1 {
+            margin: 0 0 6px;
+            font-size: 18px;
+            color: #222 !important;
+        }
+
+        .meta {
+            color: #6b7280 !important;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+            font-size: 13px;
+            border: 1px solid #d1d5db;
+            background: #fff !important;
+        }
+
+        thead th {
+            background: linear-gradient(180deg, #e0e7ef, #cdd7e5) !important;
+            text-align: center;
+            padding: 10px 6px;
+            border: 1px solid #d1d5db;
+            white-space: nowrap;
+            font-size: 12px;
+            font-weight: 600;
+            color: #333 !important;
+        }
+
+        tbody td {
+            padding: 8px 6px;
+            border: 1px solid #d1d5db;
+            color: #222 !important;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #fafbfc !important;
+        }
+
+        tbody tr:hover {
+            background: #f0f7ff !important;
+        }
+
+        .yes { 
+            color: #e53935 !important;
+            font-weight: 700;
+        }
+        .no { 
+            color: #757575 !important;
+            font-weight: 700;
+        }
+
+        .price-up {
+            color: #f44336 !important;
+            font-weight: 600;
+        }
+        .price-down {
+            color: #00b050 !important;
+            font-weight: 600;
+        }
+
+        .highlight {
+            background: #fffbe6 !important;
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 768px) {
+            body { 
+                padding: 0; 
+            }
+            .card { 
+                margin: 0; 
+                border-radius: 0;
+                padding: 12px;
+            }
+            
+            h1 { 
+                font-size: 14px;
+            }
+
+            table { 
+                font-size: 8px;
+                min-width: 280px;
+            }
+            
+            thead th {
+                padding: 4px 1px;
+                font-size: 8px;
+            }
+
+            tbody td {
+                padding: 4px 1px;
+            }
+        }
+
+        /* 禁用暗色模式 */
+        @media (prefers-color-scheme: dark) {
+            /* 所有暗色模式样式都被覆盖 */
+            body { 
+                background: #f6f9fb !important; 
+                color: #222 !important; 
+            }
+            .card { 
+                background: #fff !important; 
+            }
+            thead th { 
+                background: linear-gradient(180deg, #e0e7ef, #cdd7e5) !important;
+                color: #333 !important;
+            }
+            tbody td { 
+                color: #222 !important;
+            }
+            tbody tr:nth-child(even) {
+                background: #fafbfc !important;
+            }
+            tbody tr:hover {
+                background: #f0f7ff !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>鱼盆趋势模型 v2.0 — 移动端测试</h1>
+        <div class="meta">数据仅供市场风格趋势分析，不提供投资建议</div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>代码</th>
+                    <th>名称</th>
+                    <th>状态</th>
+                    <th>涨幅%</th>
+                    <th>现价</th>
+                    <th>临界点</th>
+                    <th>偏离率</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="highlight">
+                    <td>1</td>
+                    <td>159857</td>
+                    <td>光伏ETF</td>
+                    <td class="yes">YES</td>
+                    <td class="price-up">+1.58%</td>
+                    <td>0.90</td>
+                    <td>0.82</td>
+                    <td>10.53%</td>
+                </tr>
+                <tr class="highlight">
+                    <td>2</td>
+                    <td>399808</td>
+                    <td>中证新能</td>
+                    <td class="yes">YES</td>
+                    <td class="price-up">+1.74%</td>
+                    <td>2982.92</td>
+                    <td>2773.89</td>
+                    <td>7.54%</td>
+                </tr>
+                <tr class="highlight">
+                    <td>3</td>
+                    <td>399006</td>
+                    <td>创业板指</td>
+                    <td class="yes">YES</td>
+                    <td class="price-up">+1.84%</td>
+                    <td>3224.62</td>
+                    <td>3123.88</td>
+                    <td>3.22%</td>
+                </tr>
+                <tr>
+                    <td>15</td>
+                    <td>HST00011</td>
+                    <td>恒生科技</td>
+                    <td class="no">NO</td>
+                    <td class="price-up">+2.42%</td>
+                    <td>5.91</td>
+                    <td>5.99</td>
+                    <td>-1.21%</td>
+                </tr>
+                <tr>
+                    <td>16</td>
+                    <td>AUUSDO</td>
+                    <td>伦敦金现</td>
+                    <td class="no">NO</td>
+                    <td class="price-up">+0.11%</td>
+                    <td>3984.8</td>
+                    <td>4071.55</td>
+                    <td>-2.13%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="margin-top: 20px; padding: 10px; background: #e8f5e8; border-radius: 5px;">
+            <h3 style="color: #2e7d32; margin: 0 0 10px 0;">✅ 修复说明</h3>
+            <ul style="margin: 0; color: #2e7d32; font-size: 14px;">
+                <li>添加了 <code>meta name="color-scheme" content="light only"</code></li>
+                <li>使用 <code>!important</code> 强制覆盖暗色模式样式</li>
+                <li>注释掉了 <code>@media (prefers-color-scheme: dark)</code> 规则</li>
+                <li>确保所有颜色都使用浅色主题</li>
+                <li>优化了移动端显示效果</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
