@@ -434,7 +434,6 @@
     
     tbody td { 
       border-color: var(--border-color) !important;
-      color: #222 !important;
     }
     
     tbody tr:nth-child(even) {
@@ -460,6 +459,27 @@
     
     .muted { 
       color: var(--text-muted) !important; 
+    }
+    
+    /* 确保状态和涨跌幅颜色不被覆盖 */
+    tbody td.yes,
+    .yes { 
+      color: var(--yes-color) !important; 
+    }
+    
+    tbody td.no,
+    .no { 
+      color: var(--no-color) !important; 
+    }
+    
+    tbody td.price-up,
+    .price-up { 
+      color: var(--red-text) !important; 
+    }
+    
+    tbody td.price-down,
+    .price-down { 
+      color: var(--green-text) !important; 
     }
   </style>
 </head>
