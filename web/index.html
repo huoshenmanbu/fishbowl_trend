@@ -217,6 +217,16 @@
       font-weight: 700;
     }
 
+    /* MA5/MA10：金叉、多头偏强；死叉、空头偏弱（沿用红涨绿跌） */
+    .cross-bull {
+      color: var(--red-text);
+      font-weight: 700;
+    }
+    .cross-bear {
+      color: var(--green-text);
+      font-weight: 700;
+    }
+
     /* 数字列和状态列现在也左对齐 */
     .num-col {
       text-align: left;
@@ -490,6 +500,18 @@
       color: #666 !important; 
       font-weight: 700 !important;
     }
+
+    tbody td.cross-bull,
+    .cross-bull {
+      color: var(--red-text) !important;
+      font-weight: 700 !important;
+    }
+
+    tbody td.cross-bear,
+    .cross-bear {
+      color: var(--green-text) !important;
+      font-weight: 700 !important;
+    }
   </style>
 </head>
 <body>
@@ -517,6 +539,7 @@
             <th>现价</th>
             <th>临界点</th>
             <th>偏离率</th>
+            <th>MA5/MA10</th>
             <th class="hide-mobile">状态转变</th>
             <th class="hide-mobile">区间涨幅%</th>
           </tr>
@@ -534,6 +557,16 @@
     const statusEl = document.getElementById('status');
     const tbody = document.querySelector('#resultTable tbody');
     const updateTimeEl = document.getElementById('update-time');
+
+    /** 插入 innerHTML 前转义文本，防止异常 JSON 中的 &lt; 等破坏页面 */
+    function escapeHtml(s) {
+      if (s == null || s === '') return '';
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
 
     // 显示数据的函数
     async function displayData(data) {
@@ -564,16 +597,22 @@
         const intervalClass = intervalChange > 0 ? 'price-up' : (intervalChange < 0 ? 'price-down' : 'price-zero');
         const intervalSign = intervalChange > 0 ? '+' : '';
 
+        const sig = r.ma5_ma10_signal ?? '';
+        let crossClass = '';
+        if (sig === '金叉' || sig === '多头') crossClass = 'cross-bull';
+        else if (sig === '死叉' || sig === '空头') crossClass = 'cross-bear';
+
         tr.innerHTML = `
           <td class="rank">${r.rank ?? ''}</td>
-          <td class="code">${r.index_code ?? ''}</td>
-          <td class="name" title="${r.index_name ?? ''}">${r.index_name ?? ''}</td>
-          <td class="status-col ${r.status==='YES'?'yes':'no'}">${r.status ?? ''}</td>
+          <td class="code">${escapeHtml(r.index_code ?? '')}</td>
+          <td class="name" title="${escapeHtml(r.index_name ?? '')}">${escapeHtml(r.index_name ?? '')}</td>
+          <td class="status-col ${r.status==='YES'?'yes':'no'}">${escapeHtml(r.status ?? '')}</td>
           <td class="num-col ${priceClass}">${priceSign}${(r.price_change_pct!=null? r.price_change_pct.toFixed(2): '')}%</td>
           <td class="num-col">${(r.current_price!=null? r.current_price.toFixed(2): '')}</td>
           <td class="num-col">${(r.threshold!=null? r.threshold.toFixed(2): '')}</td>
           <td class="num-col">${(r.deviation_rate!=null? r.deviation_rate.toFixed(2): '')}%</td>
-          <td class="hide-mobile">${r.status_change_time || ''}</td>
+          <td class="num-col ${crossClass}">${escapeHtml(sig)}</td>
+          <td class="hide-mobile">${escapeHtml(r.status_change_time || '')}</td>
           <td class="hide-mobile num-col ${intervalClass}">${intervalSign}${(r.interval_change_pct!=null? r.interval_change_pct.toFixed(2): '')}%</td>
         `;
         tbody.appendChild(tr);

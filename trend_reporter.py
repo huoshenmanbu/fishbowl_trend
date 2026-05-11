@@ -4,6 +4,7 @@
 """
 import logging
 from datetime import datetime
+from html import escape
 from tabulate import tabulate
 
 logging.basicConfig(level=logging.INFO)
@@ -40,6 +41,8 @@ class TrendReporter:
             interval_change = result['interval_change_pct']
             interval_change_str = f"\033[32m{interval_change:+.2f}%\033[0m" if interval_change >= 0 else f"\033[31m{interval_change:.2f}%\033[0m"
             
+            ma_sig = result.get('ma5_ma10_signal') or ''
+            
             row = [
                 result['rank'],
                 result['index_code'],
@@ -49,6 +52,7 @@ class TrendReporter:
                 result['current_price'],
                 result['threshold'],
                 deviation_str,
+                ma_sig,
                 result['status_change_time'],
                 interval_change_str
             ]
@@ -56,7 +60,7 @@ class TrendReporter:
         
         # 表头
         headers = ['趋势\n强度', '代码', '名称', '状态', '涨幅%', '现价', 
-                   '临界\n值点', '偏离率%', '状态转\n变时间', '区间涨幅\n%']
+                   '临界\n值点', '偏离率%', 'MA5/\nMA10', '状态转\n变时间', '区间涨幅\n%']
         
         # 生成表格
         report = f"{title}    日期: {today}\n"
@@ -198,6 +202,14 @@ class TrendReporter:
             color: #333 !important;
             background: #f8f9fa !important;
         }}
+        .cross-bull {{
+            color: #f44336 !important;
+            font-weight: 700 !important;
+        }}
+        .cross-bear {{
+            color: #00b050 !important;
+            font-weight: 700 !important;
+        }}
         
         /* 移动端优化 */
         @media (max-width: 768px) {{
@@ -234,6 +246,7 @@ class TrendReporter:
                 <th>现价</th>
                 <th>临界值点</th>
                 <th>偏离率</th>
+                <th>MA5/MA10</th>
                 <th>状态转变时间</th>
                 <th>区间涨幅%</th>
             </tr>
@@ -245,7 +258,15 @@ class TrendReporter:
             status_class = 'status-yes' if result['status'] == 'YES' else 'status-no'
             price_change_class = 'positive' if result['price_change_pct'] >= 0 else 'negative'
             interval_change_class = 'positive' if result['interval_change_pct'] >= 0 else 'negative'
+            sig = result.get('ma5_ma10_signal') or ''
+            if sig in ('金叉', '多头'):
+                cross_class = 'cross-bull'
+            elif sig in ('死叉', '空头'):
+                cross_class = 'cross-bear'
+            else:
+                cross_class = ''
             
+            sig_safe = escape(sig)
             html += f"""
             <tr>
                 <td class="rank">{result['rank']}</td>
@@ -256,6 +277,7 @@ class TrendReporter:
                 <td>{result['current_price']}</td>
                 <td>{result['threshold']}</td>
                 <td>{result['deviation_rate']:.2f}%</td>
+                <td class="{cross_class}">{sig_safe}</td>
                 <td>{result['status_change_time']}</td>
                 <td class="{interval_change_class}">{result['interval_change_pct']:+.2f}%</td>
             </tr>

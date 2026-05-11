@@ -26,6 +26,21 @@ class IndexDataSource:
         os.makedirs(self.cache_path, exist_ok=True)
         self.cache_ttl = 3600  # 缓存1小时
         self.market_data = MarketDataSource()
+        self.last_fetch_meta = {}
+
+    def _set_fetch_meta(self, index_code, source, data_quality, error_reason=''):
+        self.last_fetch_meta[index_code] = {
+            'source': source,
+            'data_quality': data_quality,
+            'error_reason': error_reason
+        }
+
+    def get_last_fetch_meta(self, index_code):
+        return self.last_fetch_meta.get(index_code, {
+            'source': '',
+            'data_quality': 'missing',
+            'error_reason': ''
+        })
     
     def get_index_quote(self, index_code, start_date, end_date, force_refresh=False):
         """
@@ -36,6 +51,8 @@ class IndexDataSource:
         :param force_refresh: 是否强制刷新
         :return: DataFrame
         """
+        self._set_fetch_meta(index_code, '', 'missing', '')
+
         # 检查缓存
         cache_file = os.path.join(self.cache_path, f"{index_code}_{end_date.replace('-', '')}.csv")
         if not force_refresh and os.path.exists(cache_file):
@@ -45,18 +62,27 @@ class IndexDataSource:
                 try:
                     df = pd.read_csv(cache_file, parse_dates=['trade_date'])
                     logger.info(f"从缓存加载{index_code}数据，共{len(df)}条")
+                    self._set_fetch_meta(index_code, 'cache', 'cache_fresh', '')
                     return df
                 except Exception as e:
                     logger.warning(f"缓存读取失败: {str(e)}")
         
         # 从数据源获取（优先级：东方财富 -> 新浪 -> 网易）
         df = self._fetch_from_eastmoney(index_code, start_date, end_date)
+        meta = self.get_last_fetch_meta(index_code)
+        # 宁缺毋滥：无直接映射时不再尝试“兼容源”以免误抓其他标的
+        if meta.get('error_reason', '').startswith('no_direct_mapping_'):
+            return pd.DataFrame()
         if df is None or df.empty:
             logger.warning(f"东方财富获取{index_code}失败，尝试新浪财经")
             df = self._fetch_from_sina(index_code, start_date, end_date)
+            if df is not None and not df.empty:
+                self._set_fetch_meta(index_code, 'sina', 'fresh', '')
         if df is None or df.empty:
             logger.warning(f"新浪财经获取{index_code}失败，尝试网易财经")
             df = self._fetch_from_netease(index_code, start_date, end_date)
+            if df is not None and not df.empty:
+                self._set_fetch_meta(index_code, 'netease', 'fresh', '')
         
         # 保存缓存
         if df is not None and not df.empty:
@@ -65,6 +91,19 @@ class IndexDataSource:
                 logger.info(f"{index_code}数据已保存至缓存，共{len(df)}条")
             except Exception as e:
                 logger.error(f"保存缓存失败: {str(e)}")
+        else:
+            # 各源失败后，若存在历史缓存（且非强制刷新），可回退为 stale
+            if (not force_refresh) and os.path.exists(cache_file):
+                try:
+                    df_cache = pd.read_csv(cache_file, parse_dates=['trade_date'])
+                    if not df_cache.empty:
+                        logger.warning(f"{index_code}实时源失败，回退历史缓存，共{len(df_cache)}条")
+                        self._set_fetch_meta(index_code, 'cache', 'cache_stale', 'fetch_failed_use_cache')
+                        return df_cache
+                except Exception as e:
+                    logger.warning(f"{index_code}历史缓存回退失败: {str(e)}")
+            if not self.get_last_fetch_meta(index_code).get('error_reason'):
+                self._set_fetch_meta(index_code, '', 'missing', 'all_sources_failed')
         
         return df if df is not None else pd.DataFrame()
     
@@ -76,6 +115,8 @@ class IndexDataSource:
                 # 使用华尔街见闻API
                 logger.info(f"从华尔街见闻获取{index_code}数据")
                 df = self._fetch_from_wsj(index_code, start_date, end_date)
+                if df is not None and not df.empty:
+                    self._set_fetch_meta(index_code, 'yahoo_gold', 'fresh', '')
                 return df
             elif index_code in ['HSI00001', 'HSCEI00', 'HST00011']:  # 港股指数
                 # 使用港股专门API
@@ -93,16 +134,18 @@ class IndexDataSource:
                 em_code = f"0.{index_code}"
             elif index_code.startswith('000'):  # 上证指数
                 em_code = f"1.{index_code}"
-            elif index_code == '883418':  # 微盘股
-                em_code = "1.000852"  # 暂时使用中证1000代替
+            elif index_code == '883418':  # 微盘股（禁止替代映射）
+                self._set_fetch_meta(index_code, '', 'missing', 'no_direct_mapping_883418')
+                return None
             elif index_code.startswith('1B0688'):  # 科创50
                 em_code = "1.000688"
             elif index_code.startswith('1B0016'):  # 上证50
                 em_code = "1.000016"
             elif index_code.startswith('1B0852'):  # 中证1000
                 em_code = "1.000852"
-            elif index_code == '932000':  # 中证2000
-                em_code = "1.000985"
+            elif index_code == '932000':  # 中证2000（未知映射，宁缺毋滥）
+                self._set_fetch_meta(index_code, '', 'missing', 'no_direct_mapping_932000')
+                return None
             elif index_code.startswith('88'):  # 北证指数
                 em_code = f"0.{index_code}"
             elif index_code.startswith('899'):  # 北证指数
@@ -127,6 +170,14 @@ class IndexDataSource:
             logger.info(f"请求东方财富数据: {index_code} -> {em_code}")
             response = requests.get(url, params=params, timeout=10)
             response.encoding = 'utf-8'
+            content_type = response.headers.get('Content-Type', '')
+            body = response.text or ''
+            if response.status_code != 200:
+                self._set_fetch_meta(index_code, 'eastmoney', 'missing', f'http_{response.status_code}')
+                return None
+            if ('json' not in content_type.lower()) and (body.lstrip().startswith('<') or not body.strip()):
+                self._set_fetch_meta(index_code, 'eastmoney', 'missing', 'non_json_or_empty_response')
+                return None
             data = response.json()
             logger.debug(f"东方财富返回数据: {data}")
             
@@ -148,13 +199,16 @@ class IndexDataSource:
                 df['trade_date'] = pd.to_datetime(df['trade_date'])
                 df = df.sort_values('trade_date').reset_index(drop=True)
                 logger.info(f"东方财富获取{index_code}数据成功，共{len(df)}条")
+                self._set_fetch_meta(index_code, 'eastmoney', 'fresh', '')
                 return df
             else:
                 logger.warning(f"东方财富返回数据为空: {index_code}")
+                self._set_fetch_meta(index_code, 'eastmoney', 'missing', 'empty_klines')
                 return None
             
         except Exception as e:
             logger.error(f"东方财富获取{index_code}失败: {str(e)}")
+            self._set_fetch_meta(index_code, 'eastmoney', 'missing', str(e))
             return None
     
     def _fetch_from_wsj(self, index_code, start_date, end_date):
@@ -192,11 +246,11 @@ class IndexDataSource:
                         'low': quotes['low'][i],
                         'volume': quotes['volume'][i]
                     })
-            
-            df = pd.DataFrame(records)
-            df = df.sort_values('trade_date').reset_index(drop=True)
-            logger.info(f"华尔街见闻获取{index_code}数据成功，共{len(df)}条")
-            return df
+                df = pd.DataFrame(records)
+                df = df.sort_values('trade_date').reset_index(drop=True)
+                logger.info(f"华尔街见闻获取{index_code}数据成功，共{len(df)}条")
+                return df
+            return None
             
         except Exception as e:
             logger.error(f"华尔街见闻获取{index_code}失败: {str(e)}")
@@ -207,25 +261,24 @@ class IndexDataSource:
         # 先尝试雅虎财经
         df = self._fetch_hk_from_yahoo(index_code, start_date, end_date)
         if df is not None and not df.empty:
+            self._set_fetch_meta(index_code, 'yahoo_hk', 'fresh', '')
             return df
         
         # 如果雅虎失败，尝试新浪财经
         logger.warning(f"雅虎财经获取{index_code}失败，尝试新浪财经")
         df = self._fetch_hk_from_sina(index_code, start_date, end_date)
         if df is not None and not df.empty:
+            self._set_fetch_meta(index_code, 'sina_hk', 'fresh', '')
             return df
         
         # 如果都失败，尝试腾讯财经
         logger.warning(f"新浪财经获取{index_code}失败，尝试腾讯财经")
         df = self._fetch_hk_from_tencent(index_code, start_date, end_date)
         if df is not None and not df.empty:
+            self._set_fetch_meta(index_code, 'tencent_hk', 'fresh', '')
             return df
         
-        # 最后尝试生成合成数据（仅对特定指数）
-        if index_code in ['HST00011']:
-            logger.warning(f"所有数据源失败，生成{index_code}合成数据")
-            return self._generate_synthetic_hk_data(index_code, start_date, end_date)
-        
+        # 宁缺毋滥：不使用合成数据
         return None
     
     def _fetch_hk_from_yahoo(self, index_code, start_date, end_date):
@@ -235,7 +288,7 @@ class IndexDataSource:
             yahoo_code_map = {
                 'HSI00001': '^HSI',    # 恒生指数
                 'HSCEI00': '^HSCE',    # 国企指数
-                'HST00011': '3032.HK'  # 恒生科技ETF (更可靠的数据源)
+                'HST00011': '^HSTECH'  # 恒生科技指数（不使用ETF代理）
             }
             
             symbol = yahoo_code_map.get(index_code)
@@ -310,9 +363,9 @@ class IndexDataSource:
             if historical_data is not None and not historical_data.empty:
                 return historical_data
             elif current_data:
-                # 如果历史数据失败，至少返回当前数据
-                logger.warning(f"新浪历史数据获取失败，使用当前数据: {index_code}")
-                return self._create_current_data_df(current_data, end_date)
+                # 宁缺毋滥：仅有实时价不补造历史数据
+                logger.warning(f"新浪历史数据获取失败，仅有实时数据，放弃使用: {index_code}")
+                return None
             
             return None
             
@@ -637,6 +690,7 @@ class IndexDataSource:
                 df['trade_date'] = pd.to_datetime(df['trade_date'])
                 df = df.sort_values('trade_date').reset_index(drop=True)
                 logger.info(f"东方财富获取ETF {index_code}数据成功，共{len(df)}条")
+                self._set_fetch_meta(index_code, 'eastmoney_etf', 'fresh', '')
                 return df
             else:
                 # 如果东方财富失败，尝试腾讯接口
@@ -691,6 +745,7 @@ class IndexDataSource:
                     df['trade_date'] = pd.to_datetime(df['trade_date'])
                     df = df.sort_values('trade_date').reset_index(drop=True)
                     logger.info(f"腾讯接口获取ETF {index_code}数据成功，共{len(df)}条")
+                    self._set_fetch_meta(index_code, 'tencent_etf', 'fresh', '')
                     return df
             
             return None

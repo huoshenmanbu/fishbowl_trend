@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 渔盆趋势模型 - 指数趋势分析核心模块
-基于20日均线判断指数YES/NO状态，计算偏离率和状态转换
+基于20日均线判断指数YES/NO状态，计算偏离率和状态转换；
+并基于 MA5/MA10 给出金叉、死叉或当前多空排列信号。
 """
 import os
 import json
 import logging
 import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
 
 logging.basicConfig(
@@ -16,6 +16,34 @@ logging.basicConfig(
     handlers=[logging.FileHandler('logs/trend_analyzer.log'), logging.StreamHandler()]
 )
 logger = logging.getLogger('index_trend_analyzer')
+
+
+def _compute_ma5_ma10_signal(quote_df):
+    """
+    基于相邻两个交易日的 MA5、MA10 判定金叉/死叉；否则给出当前多头/空头排列。
+    quote_df 须已含 ma5、ma10 列，且按交易日升序。
+    """
+    if quote_df is None or len(quote_df) < 2:
+        return ''
+    if 'ma5' not in quote_df.columns or 'ma10' not in quote_df.columns:
+        return ''
+    prev = quote_df.iloc[-2]
+    curr = quote_df.iloc[-1]
+    if pd.isna(prev['ma5']) or pd.isna(prev['ma10']) or pd.isna(curr['ma5']) or pd.isna(curr['ma10']):
+        return ''
+    p5, p10 = float(prev['ma5']), float(prev['ma10'])
+    c5, c10 = float(curr['ma5']), float(curr['ma10'])
+    if p5 <= p10 and c5 > c10:
+        return '金叉'
+    if p5 >= p10 and c5 < c10:
+        return '死叉'
+    if c5 > c10:
+        return '多头'
+    if c5 < c10:
+        return '空头'
+    # MA5 与 MA10 重合（极少）：归入空头
+    return '空头'
+
 
 class IndexTrendAnalyzer:
     """指数趋势分析器"""
@@ -70,6 +98,9 @@ class IndexTrendAnalyzer:
             end_date = datetime.now().strftime('%Y-%m-%d')
             start_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
             quote_df = self.data_source.get_index_quote(index_code, start_date, end_date, force_refresh=force_refresh)
+            fetch_meta = {}
+            if hasattr(self.data_source, 'get_last_fetch_meta'):
+                fetch_meta = self.data_source.get_last_fetch_meta(index_code) or {}
             
             if quote_df.empty or len(quote_df) < self.ma_period:
                 logger.warning(f"{index_name}({index_code})数据不足，当前{len(quote_df)}条，需要{self.ma_period}条")
@@ -84,6 +115,11 @@ class IndexTrendAnalyzer:
             if quote_df.empty:
                 logger.warning(f"{index_name}({index_code})计算均线后无有效数据")
                 return None
+            
+            quote_df = quote_df.copy()
+            quote_df['ma5'] = quote_df['close'].rolling(window=5).mean()
+            quote_df['ma10'] = quote_df['close'].rolling(window=10).mean()
+            ma5_ma10_signal = _compute_ma5_ma10_signal(quote_df)
             
             # 获取最新数据
             latest = quote_df.iloc[-1]
@@ -135,6 +171,10 @@ class IndexTrendAnalyzer:
                 'current_price': round(current_price, 2),
                 'threshold': round(threshold, 2),
                 'deviation_rate': round(deviation_rate, 2),
+                'ma5_ma10_signal': ma5_ma10_signal,
+                'source': fetch_meta.get('source', ''),
+                'data_quality': fetch_meta.get('data_quality', 'fresh'),
+                'error_reason': fetch_meta.get('error_reason', ''),
                 'status_change_time': status_change_time if status_change_time else datetime.now().strftime('%Y.%m.%d').replace('.0', '.'),
                 'interval_change_pct': round(interval_change_pct, 2),
                 'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
