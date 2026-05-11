@@ -180,6 +180,10 @@ crontab -e
 
 ## 4. 常见问题排查
 
+### 4.0 PM2 报 `gunicorn:2 SyntaxError`（Node 栈）
+
+PM2 把 `venv/bin/gunicorn` 当成 **Node** 脚本执行时会这样。请使用仓库里的 `ecosystem.config.js`：**`script` 为虚拟环境的 `python`，`args` 为 `-m gunicorn ...`**，然后 `pm2 delete fishbowl_trend && pm2 start ecosystem.config.js`。
+
 ### 4.1 服务无法启动
 检查日志：
 ```bash
