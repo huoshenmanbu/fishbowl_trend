@@ -50,29 +50,31 @@ pip install -r requirements.txt
 ```
 
 ### 2.3 配置 PM2
-创建 `ecosystem.config.js` 文件：
-```javascript
-module.exports = {
-  apps: [{
-    name: "fishbowl_trend",
-    cwd: "/home/ubuntu/fishbowl_trend/fishvowl_trend/web",
-    script: "/home/ubuntu/fishbowl_trend/venv/bin/gunicorn",
-    args: "server:app -b 127.0.0.1:5000 -w 3",
-    interpreter: "/home/ubuntu/fishbowl_trend/venv/bin/python",
-    env: {
-      "PYTHONPATH": "/home/ubuntu/fishbowl_trend",
-      "FLASK_ENV": "production"
-    },
-    exec_mode: "fork",
-    instances: 1,
-    autorestart: true,
-    watch: false,
-    max_memory_restart: "500M",
-    error_file: "/home/ubuntu/fishbowl_trend/logs/err.log",
-    out_file: "/home/ubuntu/fishbowl_trend/logs/out.log",
-    log_date_format: "YYYY-MM-DD HH:mm:ss"
-  }]
-}
+
+仓库根目录已带 `ecosystem.config.js`：**Gunicorn 默认绑定 `0.0.0.0:5000`**，可直接用 `http://<服务器公网IP>:5000/` 访问（安全组需放行 **TCP 5000**）。
+
+在项目根目录执行：
+
+```bash
+cd /path/to/fishbowl_trend   # 与 ecosystem.config.js 同级
+source .venv/bin/activate    # 或 venv
+pip install -r requirements.txt
+pm2 start ecosystem.config.js
+pm2 save
+```
+
+若虚拟环境不在 `.venv` / `venv`，可指定：
+
+```bash
+export FISHBOWL_VENV=/opt/fishbowl_trend/.venv
+pm2 start ecosystem.config.js
+```
+
+若前面用 **Nginx** 反代本机 5000 端口，可只监听本机（需改环境变量后启动）：
+
+```bash
+export WEB_BIND=127.0.0.1:5000
+pm2 start ecosystem.config.js
 ```
 
 ### 2.4 配置 Nginx
