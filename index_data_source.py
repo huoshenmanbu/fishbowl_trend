@@ -9,6 +9,8 @@ import pandas as pd
 import requests
 import time
 from datetime import datetime, timedelta
+from urllib3.exceptions import ProtocolError
+from requests.exceptions import ChunkedEncodingError
 from market_data_source import MarketDataSource
 
 logging.basicConfig(
@@ -27,6 +29,74 @@ class IndexDataSource:
         self.cache_ttl = 3600  # 缓存1小时
         self.market_data = MarketDataSource()
         self.last_fetch_meta = {}
+        self._session = requests.Session()
+        # 默认遵循系统网络设置；遇到代理握手异常时在单次请求内自动回退直连
+        self._session.trust_env = True
+
+    def _http_get(self, url, *, params=None, timeout=15, referer=None, encoding=None, extra_headers=None):
+        """
+        带浏览器头与有限重试的 GET。云主机访问财经站时，无头请求易被断开或返回挑战页。
+        """
+        headers = {
+            'User-Agent': (
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            ),
+            'Accept': '*/*',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Connection': 'keep-alive',
+        }
+        if referer:
+            headers['Referer'] = referer
+        if extra_headers:
+            headers.update(extra_headers)
+        retryable_status = {408, 425, 429, 500, 502, 503, 504}
+        last_err = None
+        for attempt in range(4):
+            try:
+                resp = self._session.get(url, params=params, headers=headers, timeout=timeout)
+                if encoding:
+                    resp.encoding = encoding
+                # 站点临时限流/网关波动时，做有限重试提升稳定性
+                if resp.status_code in retryable_status:
+                    last_err = requests.exceptions.HTTPError(
+                        f"retryable_http_{resp.status_code}"
+                    )
+                    logger.warning(
+                        f'HTTP GET 重试 {attempt + 1}/4 {url[:72]}... status={resp.status_code}'
+                    )
+                    time.sleep(min(3.0, 0.6 * (2 ** attempt)))
+                    continue
+                return resp
+            except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+                requests.exceptions.ProxyError,
+                ChunkedEncodingError,
+                ProtocolError,
+            ) as e:
+                last_err = e
+                if isinstance(e, requests.exceptions.ProxyError):
+                    try:
+                        resp = self._session.get(
+                            url,
+                            params=params,
+                            headers=headers,
+                            timeout=timeout,
+                            proxies={"http": "", "https": ""},
+                        )
+                        if encoding:
+                            resp.encoding = encoding
+                        if resp.status_code not in retryable_status:
+                            logger.warning(f'代理异常，已直连成功: {url[:72]}...')
+                            return resp
+                    except Exception:
+                        pass
+                logger.warning(f'HTTP GET 重试 {attempt + 1}/4 {url[:72]}... {e}')
+                time.sleep(min(3.0, 0.6 * (2 ** attempt)))
+        if last_err:
+            raise last_err
+        raise requests.exceptions.RequestException('HTTP GET failed')
 
     def _set_fetch_meta(self, index_code, source, data_quality, error_reason=''):
         self.last_fetch_meta[index_code] = {
@@ -51,6 +121,14 @@ class IndexDataSource:
         :param force_refresh: 是否强制刷新
         :return: DataFrame
         """
+        # 这两个代码当前无可靠直连映射，入口直接短路，避免无效网络请求
+        if index_code == '883418':
+            self._set_fetch_meta(index_code, '', 'missing', 'no_direct_mapping_883418')
+            return pd.DataFrame()
+        if index_code == '932000':
+            self._set_fetch_meta(index_code, '', 'missing', 'no_direct_mapping_932000')
+            return pd.DataFrame()
+
         self._set_fetch_meta(index_code, '', 'missing', '')
 
         # 检查缓存
@@ -67,8 +145,20 @@ class IndexDataSource:
                 except Exception as e:
                     logger.warning(f"缓存读取失败: {str(e)}")
         
-        # 从数据源获取（优先级：东方财富 -> 新浪 -> 网易）
-        df = self._fetch_from_eastmoney(index_code, start_date, end_date)
+        # 从数据源获取（优先级：腾讯 -> 搜狐 -> 东方财富 -> 新浪 -> 网易）
+        df = self._fetch_from_tencent(index_code, start_date, end_date)
+        if df is not None and not df.empty:
+            self._set_fetch_meta(index_code, 'tencent', 'fresh', '')
+
+        if df is None or df.empty:
+            logger.warning(f"腾讯财经获取{index_code}失败，尝试搜狐证券")
+            df = self._fetch_from_sohu(index_code, start_date, end_date)
+            if df is not None and not df.empty:
+                self._set_fetch_meta(index_code, 'sohu', 'fresh', '')
+
+        if df is None or df.empty:
+            logger.warning(f"搜狐证券获取{index_code}失败，尝试东方财富")
+            df = self._fetch_from_eastmoney(index_code, start_date, end_date)
         meta = self.get_last_fetch_meta(index_code)
         # 宁缺毋滥：无直接映射时不再尝试“兼容源”以免误抓其他标的
         if meta.get('error_reason', '').startswith('no_direct_mapping_'):
@@ -155,7 +245,7 @@ class IndexDataSource:
             else:
                 em_code = index_code
             
-            url = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
+            url = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
             params = {
                 'secid': em_code,
                 'fields1': 'f1,f2,f3,f4,f5,f6',
@@ -168,7 +258,12 @@ class IndexDataSource:
             }
             
             logger.info(f"请求东方财富数据: {index_code} -> {em_code}")
-            response = requests.get(url, params=params, timeout=10)
+            response = self._http_get(
+                url,
+                params=params,
+                timeout=15,
+                referer='https://quote.eastmoney.com/',
+            )
             response.encoding = 'utf-8'
             content_type = response.headers.get('Content-Type', '')
             body = response.text or ''
@@ -227,7 +322,12 @@ class IndexDataSource:
                 "User-Agent": "Mozilla/5.0"
             }
             
-            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response = self._http_get(
+                url,
+                params=params,
+                timeout=10,
+                extra_headers=headers,
+            )
             data = response.json()
             
             if data.get('chart', {}).get('result'):
@@ -258,7 +358,14 @@ class IndexDataSource:
     
     def _fetch_from_hk(self, index_code, start_date, end_date):
         """获取港股指数数据，支持多个数据源"""
-        # 先尝试雅虎财经
+        # 先尝试当前可用性更好的腾讯财经
+        df = self._fetch_hk_from_tencent(index_code, start_date, end_date)
+        if df is not None and not df.empty:
+            self._set_fetch_meta(index_code, 'tencent_hk', 'fresh', '')
+            return df
+
+        # 如果腾讯失败，尝试雅虎财经
+        logger.warning(f"腾讯财经获取{index_code}失败，尝试雅虎财经")
         df = self._fetch_hk_from_yahoo(index_code, start_date, end_date)
         if df is not None and not df.empty:
             self._set_fetch_meta(index_code, 'yahoo_hk', 'fresh', '')
@@ -269,13 +376,6 @@ class IndexDataSource:
         df = self._fetch_hk_from_sina(index_code, start_date, end_date)
         if df is not None and not df.empty:
             self._set_fetch_meta(index_code, 'sina_hk', 'fresh', '')
-            return df
-        
-        # 如果都失败，尝试腾讯财经
-        logger.warning(f"新浪财经获取{index_code}失败，尝试腾讯财经")
-        df = self._fetch_hk_from_tencent(index_code, start_date, end_date)
-        if df is not None and not df.empty:
-            self._set_fetch_meta(index_code, 'tencent_hk', 'fresh', '')
             return df
         
         # 宁缺毋滥：不使用合成数据
@@ -307,7 +407,12 @@ class IndexDataSource:
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
             
-            response = requests.get(url, params=params, headers=headers, timeout=15)
+            response = self._http_get(
+                url,
+                params=params,
+                timeout=15,
+                extra_headers=headers,
+            )
             data = response.json()
             
             if data.get('chart', {}).get('result'):
@@ -382,7 +487,11 @@ class IndexDataSource:
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
             
-            response = requests.get(url, headers=headers, timeout=10)
+            response = self._http_get(
+                url,
+                timeout=10,
+                extra_headers=headers,
+            )
             response.encoding = 'utf-8'
             data = response.text
             
@@ -423,7 +532,12 @@ class IndexDataSource:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
             
-            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response = self._http_get(
+                url,
+                params=params,
+                timeout=10,
+                extra_headers=headers,
+            )
             response.encoding = 'utf-8'
             text = response.text
             
@@ -525,7 +639,8 @@ class IndexDataSource:
             # 腾讯港股接口
             url = f"http://web.ifzq.gtimg.cn/appstock/app/hkfqkline/get"
             params = {
-                'param': f'{tencent_code},day,{start_date},{end_date},640',
+                # 腾讯港股K线接口当前要求补齐复权参数，否则会返回 bad params
+                'param': f'{tencent_code},day,{start_date},{end_date},640,qfq',
                 '_var': 'kline_day',
                 '_': str(int(time.time() * 1000))
             }
@@ -535,7 +650,12 @@ class IndexDataSource:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
             
-            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response = self._http_get(
+                url,
+                params=params,
+                timeout=10,
+                extra_headers=headers,
+            )
             response.encoding = 'utf-8'
             text = response.text
             
@@ -655,7 +775,7 @@ class IndexDataSource:
             # 先尝试东方财富ETF接口
             em_code = f"0.{index_code}"  # 深交所ETF
             
-            url = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
+            url = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
             params = {
                 'secid': em_code,
                 'fields1': 'f1,f2,f3,f4,f5,f6',
@@ -668,7 +788,12 @@ class IndexDataSource:
             }
             
             logger.info(f"请求东方财富ETF数据: {index_code} -> {em_code}")
-            response = requests.get(url, params=params, timeout=10)
+            response = self._http_get(
+                url,
+                params=params,
+                timeout=15,
+                referer='https://quote.eastmoney.com/',
+            )
             response.encoding = 'utf-8'
             data = response.json()
             
@@ -718,7 +843,13 @@ class IndexDataSource:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
             
-            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response = self._http_get(
+                url,
+                params=params,
+                timeout=15,
+                referer='http://gu.qq.com/',
+                extra_headers=headers,
+            )
             response.encoding = 'utf-8'
             text = response.text
             
@@ -729,7 +860,14 @@ class IndexDataSource:
                 data = json.loads(json_str)
                 
                 if data.get('code') == 0 and data.get('data'):
-                    klines = data['data'][index_code]['day']
+                    payload = data.get('data', {})
+                    # 腾讯返回键通常是 sz159857，不是裸代码
+                    symbol_key = f"sz{index_code}"
+                    symbol_data = payload.get(symbol_key) or payload.get(index_code)
+                    if not symbol_data or 'day' not in symbol_data:
+                        logger.warning(f"腾讯ETF响应缺少day数据: keys={list(payload.keys())[:5]}")
+                        return None
+                    klines = symbol_data['day']
                     records = []
                     for kline in klines:
                         records.append({
@@ -753,6 +891,153 @@ class IndexDataSource:
         except Exception as e:
             logger.error(f"腾讯接口获取ETF {index_code}失败: {str(e)}")
             return None
+
+    def _tencent_index_symbol(self, index_code):
+        """转换为腾讯指数/基金K线接口代码。"""
+        if index_code in {'883418', '932000'}:
+            return None
+        lb_map = {
+            '1B0688': 'sh000688',
+            '1B0016': 'sh000016',
+            '1B0852': 'sh000852',
+        }
+        if index_code in lb_map:
+            return lb_map[index_code]
+        if index_code.startswith('399'):
+            return f'sz{index_code}'
+        if index_code.startswith('000'):
+            return f'sh{index_code}'
+        if index_code.startswith('159'):
+            return f'sz{index_code}'
+        if index_code.startswith('899') or index_code.startswith('88'):
+            return f'bj{index_code}'
+        return None
+
+    def _fetch_from_tencent(self, index_code, start_date, end_date):
+        """从腾讯财经获取A股指数/ETF日线数据。"""
+        try:
+            symbol = self._tencent_index_symbol(index_code)
+            if not symbol:
+                return None
+
+            url = "http://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+            params = {
+                'param': f'{symbol},day,{start_date},{end_date},640,qfq',
+                '_var': 'kline_dayqfq',
+                '_': str(int(time.time() * 1000))
+            }
+
+            response = self._http_get(
+                url,
+                params=params,
+                timeout=15,
+                referer='http://gu.qq.com/',
+            )
+            response.encoding = 'utf-8'
+            text = response.text
+
+            if 'kline_dayqfq=' not in text:
+                logger.warning(f"腾讯接口返回数据格式错误: {index_code}")
+                return None
+
+            import json
+            data = json.loads(text.split('kline_dayqfq=')[1])
+            payload = data.get('data') or {}
+            symbol_data = payload.get(symbol)
+            if data.get('code') != 0 or not symbol_data or 'day' not in symbol_data:
+                logger.warning(f"腾讯接口无日线数据: {index_code} keys={list(payload.keys())[:5]}")
+                return None
+
+            records = []
+            for kline in symbol_data['day']:
+                records.append({
+                    'trade_date': kline[0],
+                    'open': float(kline[1]),
+                    'close': float(kline[2]),
+                    'high': float(kline[3]),
+                    'low': float(kline[4]),
+                    'volume': float(kline[5]) if len(kline) > 5 and kline[5] else 0
+                })
+
+            if len(records) < 5:
+                logger.warning(f"腾讯接口日线数据过少: {index_code} rows={len(records)}")
+                return None
+
+            df = pd.DataFrame(records)
+            if df.empty:
+                return None
+            df['trade_date'] = pd.to_datetime(df['trade_date'])
+            df = df.sort_values('trade_date').reset_index(drop=True)
+            logger.info(f"腾讯财经获取{index_code}数据成功，共{len(df)}条")
+            return df
+
+        except Exception as e:
+            logger.error(f"腾讯财经获取{index_code}失败: {str(e)}")
+            return None
+
+    def _fetch_from_sohu(self, index_code, start_date, end_date):
+        """从搜狐证券获取少数指数日线数据。"""
+        try:
+            sohu_code_map = {
+                '899050': 'zs_899050',
+            }
+            sohu_code = sohu_code_map.get(index_code)
+            if not sohu_code:
+                return None
+
+            url = 'https://q.stock.sohu.com/hisHq'
+            params = {
+                'code': sohu_code,
+                'stat': '1',
+                'order': 'D',
+                'period': 'd',
+                'callback': 'historySearchHandler',
+                'rt': 'jsonp',
+            }
+            response = self._http_get(
+                url,
+                params=params,
+                timeout=15,
+                referer=f'https://q.stock.sohu.com/zs/{index_code}/lshq.shtml',
+                encoding='gbk',
+            )
+            text = (response.text or '').strip()
+            prefix = 'historySearchHandler('
+            if not text.startswith(prefix) or not text.endswith(')'):
+                logger.warning(f"搜狐接口返回数据格式错误: {index_code}")
+                return None
+
+            import json
+            data = json.loads(text[len(prefix):-1].rstrip(';'))
+            if not data or data[0].get('status') != 0:
+                logger.warning(f"搜狐接口无有效数据: {index_code}")
+                return None
+
+            start = pd.to_datetime(start_date)
+            end = pd.to_datetime(end_date)
+            records = []
+            for item in data[0].get('hq', []):
+                trade_date = pd.to_datetime(item[0])
+                if start <= trade_date <= end:
+                    records.append({
+                        'trade_date': trade_date,
+                        'open': float(item[1]),
+                        'close': float(item[2]),
+                        'high': float(item[6]),
+                        'low': float(item[5]),
+                        'volume': float(item[7]) if item[7] else 0,
+                    })
+
+            if not records:
+                return None
+            df = pd.DataFrame(records)
+            df = df.sort_values('trade_date').reset_index(drop=True)
+            logger.info(f"搜狐证券获取{index_code}数据成功，共{len(df)}条")
+            return df
+
+        except Exception as e:
+            logger.error(f"搜狐证券获取{index_code}失败: {str(e)}")
+            return None
     
     def _fetch_from_sina(self, index_code, start_date, end_date):
         """从新浪财经获取指数数据"""
@@ -767,8 +1052,12 @@ class IndexDataSource:
             
             url = f"https://finance.sina.com.cn/realstock/company/{sina_code}/hisdata/klc_kl.js"
             
-            response = requests.get(url, timeout=10)
-            response.encoding = 'gb2312'
+            response = self._http_get(
+                url,
+                timeout=15,
+                referer='https://finance.sina.com.cn/',
+                encoding='gb2312',
+            )
             
             # 解析返回数据
             data = response.text
@@ -816,51 +1105,81 @@ class IndexDataSource:
             logger.error(f"新浪获取{index_code}失败: {str(e)}")
             return None
     
+    def _netease_list_code(self, index_code):
+        """
+        网易 chddata 的 code：沪市 0+六位，深市 1+六位。
+        1B 系列需映射到上交所指数六位码。
+        """
+        if index_code.startswith('399'):
+            return f'1{index_code}'
+        if index_code.startswith('000'):
+            return f'0{index_code}'
+        lb_map = {
+            '1B0688': '000688',
+            '1B0016': '000016',
+            '1B0852': '000852',
+        }
+        if index_code in lb_map:
+            return f'0{lb_map[index_code]}'
+        if index_code.startswith('899'):
+            return f'0{index_code}'
+        if index_code.startswith('159'):
+            return f'1{index_code}'
+        return None
+
     def _fetch_from_netease(self, index_code, start_date, end_date):
         """从网易财经获取指数数据"""
         try:
-            # 网易代码转换
-            if index_code.startswith('399'):
-                netease_code = f"0{index_code}"
-            elif index_code.startswith(('000', '1B')):
-                netease_code = f"1{index_code}"
-            else:
+            netease_code = self._netease_list_code(index_code)
+            if not netease_code:
                 return None
-            
-            # 计算时间戳
+
             start_ts = datetime.strptime(start_date, '%Y-%m-%d')
             end_ts = datetime.strptime(end_date, '%Y-%m-%d')
-            
-            url = f"http://quotes.money.163.com/service/chddata.html"
+
+            url = 'http://quotes.money.163.com/service/chddata.html'
             params = {
                 'code': netease_code,
                 'start': start_ts.strftime('%Y%m%d'),
                 'end': end_ts.strftime('%Y%m%d'),
-                'fields': 'TCLOSE;HIGH;LOW;TOPEN;VOTURNOVER'
+                'fields': 'TCLOSE;HIGH;LOW;TOPEN;VOTURNOVER',
             }
-            
-            response = requests.get(url, params=params, timeout=10)
-            response.encoding = 'gbk'
-            
+
+            response = self._http_get(
+                url,
+                params=params,
+                timeout=15,
+                referer='http://quotes.money.163.com/',
+                encoding='gbk',
+            )
+
             from io import StringIO
-            df = pd.read_csv(StringIO(response.text))
-            
-            # 重命名列
+            raw = response.text or ''
+            if not raw.strip() or raw.lstrip().startswith('<'):
+                logger.warning(f"网易返回非CSV: {index_code} preview={raw[:200]!r}")
+                return None
+
+            df = pd.read_csv(StringIO(raw))
+            if df.empty or '日期' not in df.columns:
+                logger.warning(
+                    f"网易CSV无「日期」列: {index_code} code={netease_code} columns={list(df.columns)}"
+                )
+                return None
+
             df.rename(columns={
                 '日期': 'trade_date',
                 '收盘价': 'close',
                 '开盘价': 'open',
                 '最高价': 'high',
                 '最低价': 'low',
-                '成交量': 'volume'
+                '成交量': 'volume',
             }, inplace=True)
-            
+
             df['trade_date'] = pd.to_datetime(df['trade_date'])
             df = df.sort_values('trade_date').reset_index(drop=True)
             logger.info(f"网易获取{index_code}数据成功，共{len(df)}条")
             return df
-            
+
         except Exception as e:
             logger.error(f"网易获取{index_code}失败: {str(e)}")
             return None
-

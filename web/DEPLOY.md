@@ -49,102 +49,52 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2.3 配置 PM2
+### 2.4 配置 PM2 + Gunicorn（仅本机 5000）
 
-仓库根目录已带 `ecosystem.config.js`：**Gunicorn 默认绑定 `0.0.0.0:5000`**，可直接用 `http://<服务器公网IP>:5000/` 访问（安全组需放行 **TCP 5000**）。
-
-在项目根目录执行：
+仓库根目录 `ecosystem.config.js` 默认 **`127.0.0.1:5000`**，不应对公网直接暴露 5000（可减少扫描器刷 Gunicorn 日志）。
 
 ```bash
-cd /path/to/fishbowl_trend   # 与 ecosystem.config.js 同级
-source .venv/bin/activate    # 或 venv
+cd /root/fishbowl_trend   # 与 ecosystem.config.js 同级
+source venv/bin/activate
 pip install -r requirements.txt
+pm2 delete fishbowl_trend 2>/dev/null || true
 pm2 start ecosystem.config.js
 pm2 save
 ```
 
-若虚拟环境不在 `.venv` / `venv`，可指定：
+虚拟环境路径非默认时：
 
 ```bash
-export FISHBOWL_VENV=/opt/fishbowl_trend/.venv
+export FISHBOWL_VENV=/root/fishbowl_trend/venv
 pm2 start ecosystem.config.js
 ```
 
-若前面用 **Nginx** 反代本机 5000 端口，可只监听本机（需改环境变量后启动）：
+### 2.5 配置 Nginx（推荐，对外 80）
 
 ```bash
-export WEB_BIND=127.0.0.1:5000
-pm2 start ecosystem.config.js
-```
-
-### 2.4 配置 Nginx
-创建服务文件：
-```bash
-sudo nano /etc/systemd/system/fishbowl.service
-```
-
-写入以下内容：
-```ini
-[Unit]
-Description=Fishbowl Trend Analysis Web Server
-After=network.target
-
-[Service]
-Type=simple
-User=your-username
-WorkingDirectory=/opt/fishbowl_trend
-Environment="PATH=/opt/fishbowl_trend/.venv/bin"
-ExecStart=/opt/fishbowl_trend/.venv/bin/python web/server.py
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-```
-
-启用并启动服务：
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable fishbowl
-sudo systemctl start fishbowl
-```
-
-### 2.6 配置 Nginx（可选，推荐）
-```bash
-sudo apt install nginx
-
-# 创建 Nginx 配置
+sudo apt install -y nginx
+sudo cp /root/fishbowl_trend/deploy/nginx/fishbowl.conf /etc/nginx/sites-available/fishbowl
+# 编辑 server_name 为你的公网 IP 或域名
 sudo nano /etc/nginx/sites-available/fishbowl
+sudo ln -sf /etc/nginx/sites-available/fishbowl /etc/nginx/sites-enabled/fishbowl
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
-写入以下配置：
-```nginx
-server {
-    listen 80;
-    server_name your-domain-or-ip;
+浏览器访问：**`http://47.79.93.60/`**（换成你的 IP）。
 
-    location / {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
-```
+### 2.6 安全组 / 防火墙
 
-启用站点：
+- **放行**：TCP **80**（Nginx）
+- **关闭**：对 `0.0.0.0/0` 的 TCP **5000**（仅本机访问即可）
+
 ```bash
-sudo ln -s /etc/nginx/sites-available/fishbowl /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
+sudo ufw allow 80/tcp
+sudo ufw deny 5000/tcp
+sudo ufw reload
 ```
 
-### 2.7 配置防火墙（如果启用了防火墙）
-```bash
-# 如果使用 UFW
-sudo ufw allow 80/tcp  # 如果使用 Nginx
-sudo ufw allow 5000/tcp  # 如果直接访问 Flask
-```
+阿里云控制台 → 安全组入方向：同样只开放 80，删除 5000 的公网规则。
 
 ## 3. 注意事项
 
