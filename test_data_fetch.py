@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 测试数据获取脚本
-专门测试159857光伏ETF和HST00011恒生科技的数据获取
+专门测试159857光伏ETF、HST00011恒生科技和883418微盘股指数的数据获取
 """
 import os
 import sys
 import logging
 from datetime import datetime, timedelta
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
 
 # 设置日志
 logging.basicConfig(
@@ -69,6 +74,7 @@ def main():
     # 测试目标指数
     test_cases = [
         ('159857', '光伏ETF'),
+        ('883418', '微盘股'),
         ('HST00011', '恒生科技'),
         ('HSI00001', '恒生指数'),  # 作为对比
         ('399300', '沪深300')     # 作为对比

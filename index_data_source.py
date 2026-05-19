@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 指数数据源模块 - 支持获取各类指数行情数据
-支持多数据源：东方财富、新浪财经、腾讯财经
+支持多数据源：东方财富、新浪财经、腾讯财经、同花顺板块
 """
 import os
 import logging
@@ -121,10 +121,7 @@ class IndexDataSource:
         :param force_refresh: 是否强制刷新
         :return: DataFrame
         """
-        # 这两个代码当前无可靠直连映射，入口直接短路，避免无效网络请求
-        if index_code == '883418':
-            self._set_fetch_meta(index_code, '', 'missing', 'no_direct_mapping_883418')
-            return pd.DataFrame()
+        # 932000 当前仍未找到稳定、可直接落地的免费历史源，先保持短路
         if index_code == '932000':
             self._set_fetch_meta(index_code, '', 'missing', 'no_direct_mapping_932000')
             return pd.DataFrame()
@@ -208,6 +205,13 @@ class IndexDataSource:
                 if df is not None and not df.empty:
                     self._set_fetch_meta(index_code, 'yahoo_gold', 'fresh', '')
                 return df
+            elif index_code == '883418':  # 微盘股指数
+                # 使用同花顺板块历史线
+                logger.info(f"从同花顺板块接口获取{index_code}数据")
+                df = self._fetch_from_ths_board(index_code, start_date, end_date)
+                if df is not None and not df.empty:
+                    self._set_fetch_meta(index_code, 'ths_board', 'fresh', '')
+                return df
             elif index_code in ['HSI00001', 'HSCEI00', 'HST00011']:  # 港股指数
                 # 使用港股专门API
                 logger.info(f"从港股专门API获取{index_code}数据")
@@ -224,9 +228,6 @@ class IndexDataSource:
                 em_code = f"0.{index_code}"
             elif index_code.startswith('000'):  # 上证指数
                 em_code = f"1.{index_code}"
-            elif index_code == '883418':  # 微盘股（禁止替代映射）
-                self._set_fetch_meta(index_code, '', 'missing', 'no_direct_mapping_883418')
-                return None
             elif index_code.startswith('1B0688'):  # 科创50
                 em_code = "1.000688"
             elif index_code.startswith('1B0016'):  # 上证50
@@ -973,6 +974,88 @@ class IndexDataSource:
 
         except Exception as e:
             logger.error(f"腾讯财经获取{index_code}失败: {str(e)}")
+            return None
+
+    def _fetch_from_ths_board(self, index_code, start_date, end_date):
+        """从同花顺板块历史线获取日线数据。
+
+        883418 是同花顺微盘股指数，对应 thshy/detail/code/883418。
+        """
+        try:
+            if index_code != '883418':
+                return None
+
+            start = pd.to_datetime(start_date)
+            end = pd.to_datetime(end_date)
+            begin_year = start.year
+            end_year = end.year
+            records = []
+
+            def _to_float(value, default=None):
+                if value is None or value == '':
+                    return default
+                try:
+                    return float(value)
+                except Exception:
+                    return default
+
+            for year in range(begin_year, end_year + 1):
+                url = f"https://d.10jqka.com.cn/v4/line/bk_{index_code}/01/{year}.js"
+                response = self._http_get(
+                    url,
+                    timeout=15,
+                    referer='http://q.10jqka.com.cn/',
+                    extra_headers={'Host': 'd.10jqka.com.cn'},
+                )
+                text = (response.text or '').strip()
+                if '(' not in text or not text.endswith(')'):
+                    logger.warning(f"同花顺板块接口返回格式错误: {index_code} year={year}")
+                    continue
+
+                import json
+
+                payload = json.loads(text[text.find('(') + 1:-1])
+                data_text = payload.get('data', '')
+                if not data_text:
+                    continue
+
+                for row in data_text.split(';'):
+                    if not row:
+                        continue
+                    parts = row.split(',')
+                    if len(parts) < 7:
+                        continue
+                    trade_date = pd.to_datetime(parts[0], format='%Y%m%d', errors='coerce')
+                    if pd.isna(trade_date) or trade_date < start or trade_date > end:
+                        continue
+                    close_price = _to_float(parts[4])
+                    if close_price is None:
+                        continue
+                    open_price = _to_float(parts[1], close_price)
+                    high_price = _to_float(parts[2], close_price)
+                    low_price = _to_float(parts[3], close_price)
+                    records.append({
+                        'trade_date': trade_date,
+                        'open': open_price,
+                        'high': high_price,
+                        'low': low_price,
+                        'close': close_price,
+                        'volume': _to_float(parts[5], 0) or 0,
+                        'amount': _to_float(parts[6], 0) or 0,
+                    })
+
+            if len(records) < 5:
+                logger.warning(f"同花顺板块数据过少: {index_code} rows={len(records)}")
+                return None
+
+            df = pd.DataFrame(records)
+            df['trade_date'] = pd.to_datetime(df['trade_date'])
+            df = df.sort_values('trade_date').drop_duplicates('trade_date').reset_index(drop=True)
+            logger.info(f"同花顺板块获取{index_code}数据成功，共{len(df)}条")
+            return df
+
+        except Exception as e:
+            logger.error(f"同花顺板块获取{index_code}失败: {str(e)}")
             return None
 
     def _fetch_from_sohu(self, index_code, start_date, end_date):
