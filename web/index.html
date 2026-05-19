@@ -668,21 +668,28 @@
           return;
         }
 
-        // 如果计算已开始，持续轮询直到有新结果
-        if(j.triggered_run) {
+        // 计算触发或已有任务在跑：轮询状态接口，直到任务结束再拉新数据
+        if(j.triggered_run || j.message === 'main_trend.py is already running') {
           let retries = 0;
           const maxRetries = 40; // 最多等待40次，每次3秒 = 2分钟
           
           while(retries < maxRetries) {
             await new Promise(resolve => setTimeout(resolve, 3000)); // 等待3秒
-            const pollRes = await fetch('/api/latest');
-            const pollData = await pollRes.json();
-            
-            if(pollData.ok && pollData.data) {
-              // 如果更新时间比点击时的时间新，就认为是新数据
-              if(pollData.data.update_time !== currentUpdateTime) {
+            const statusRes = await fetch('/api/refresh/status');
+            const statusData = await statusRes.json();
+
+            if(statusData.ok && !statusData.running) {
+              const pollRes = await fetch('/api/latest');
+              const pollData = await pollRes.json();
+              if(pollData.ok && pollData.data) {
                 await displayData(pollData.data);
-                statusEl.textContent = '✓ 计算完成，数据已更新';
+                if(pollData.data.update_time !== currentUpdateTime) {
+                  statusEl.textContent = '✓ 计算完成，数据已更新';
+                } else {
+                  statusEl.textContent = statusData.last_error
+                    ? `计算结束但无新数据: ${statusData.last_error}`
+                    : '计算结束，但数据更新时间未变化';
+                }
                 return;
               }
             }

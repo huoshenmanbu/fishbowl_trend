@@ -43,7 +43,10 @@ const PYTHON = fs.existsSync(path.join(VENV, 'bin', 'python'))
 
 const WEB_BIND = process.env.WEB_BIND || '127.0.0.1:5000';
 const WEB_WORKERS = process.env.WEB_WORKERS || '3';
-const GUNICORN_TIMEOUT = process.env.GUNICORN_TIMEOUT || '120';
+const GUNICORN_TIMEOUT = process.env.GUNICORN_TIMEOUT || '300';
+const GUNICORN_GRACEFUL_TIMEOUT = process.env.GUNICORN_GRACEFUL_TIMEOUT || '30';
+const GUNICORN_KEEPALIVE = process.env.GUNICORN_KEEPALIVE || '5';
+const GUNICORN_THREADS = process.env.GUNICORN_THREADS || '4';
 
 module.exports = {
   apps: [
@@ -51,7 +54,7 @@ module.exports = {
       name: 'fishbowl_trend',
       cwd: path.join(ROOT, 'web'),
       script: PYTHON,
-      args: `-m gunicorn server:app -b ${WEB_BIND} -w ${WEB_WORKERS} --timeout ${GUNICORN_TIMEOUT}`,
+      args: `-m gunicorn server:app -b ${WEB_BIND} -w ${WEB_WORKERS} --worker-class gthread --threads ${GUNICORN_THREADS} --timeout ${GUNICORN_TIMEOUT} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT} --keep-alive ${GUNICORN_KEEPALIVE}`,
       interpreter: 'none',
       env: {
         PYTHONPATH: path.join(ROOT, 'web'),

@@ -9,7 +9,6 @@ import secrets
 from functools import wraps
 from time import time
 from datetime import datetime
-import pytz
 
 # Server sits in fishvowl_trend/web, project root is parent
 WEB_DIR = Path(__file__).resolve().parent
@@ -41,23 +40,30 @@ def add_security_headers(response):
 
 # 限制请求频率
 request_history = {}
+request_history_lock = threading.Lock()
+refresh_lock = threading.Lock()
+refresh_running = False
+refresh_started_at = None
+refresh_finished_at = None
+refresh_last_error = ''
 def rate_limit(max_requests=10, window=60):  # 每分钟最多10次请求
     def decorator(f):
         @wraps(f)
         def wrapped(*args, **kwargs):
             now = time()
             remote_addr = request.remote_addr
-            
-            # 清理过期的请求记录
-            if remote_addr in request_history:
-                request_history[remote_addr] = [t for t in request_history[remote_addr] if t > now - window]
-            
-            # 检查请求频率
-            if remote_addr in request_history and len(request_history[remote_addr]) >= max_requests:
-                return jsonify({'error': 'Too many requests'}), 429
-            
-            # 记录新请求
-            request_history.setdefault(remote_addr, []).append(now)
+
+            with request_history_lock:
+                # 清理过期的请求记录
+                if remote_addr in request_history:
+                    request_history[remote_addr] = [t for t in request_history[remote_addr] if t > now - window]
+
+                # 检查请求频率
+                if remote_addr in request_history and len(request_history[remote_addr]) >= max_requests:
+                    return jsonify({'error': 'Too many requests'}), 429
+
+                # 记录新请求
+                request_history.setdefault(remote_addr, []).append(now)
             return f(*args, **kwargs)
         return wrapped
     return decorator
@@ -104,6 +110,7 @@ def api_latest():
 
 
 @app.route('/api/refresh', methods=['POST'])
+@rate_limit(max_requests=5, window=60)
 def api_refresh():
     """If JSON payload has {"run":true} we try to run main_trend.py in background, then return latest JSON if available."""
     payload = request.get_json(silent=True) or {}
@@ -116,25 +123,45 @@ def api_refresh():
             return jsonify({'ok': False, 'error': 'main_trend.py not found', 'path': str(main_py)}), 404
 
         def run_main():
+            global refresh_running, refresh_finished_at, refresh_last_error
             try:
-                # Set timezone to Asia/Shanghai before running
-                os.environ['TZ'] = 'Asia/Shanghai'
                 # Respect PYTHON env var if provided, otherwise use default 'python'
                 python_exe = os.environ.get('PYTHON', 'python')
                 # Set PYTHONIOENCODING to ensure correct character encoding
                 my_env = os.environ.copy()
                 my_env['PYTHONIOENCODING'] = 'utf-8'
                 my_env['TZ'] = 'Asia/Shanghai'
-                subprocess.run([python_exe, str(main_py)], 
-                            cwd=str(PROJECT_ROOT), 
-                            timeout=600,
-                            env=my_env)
+                completed = subprocess.run(
+                    [python_exe, str(main_py)],
+                    cwd=str(PROJECT_ROOT),
+                    timeout=600,
+                    env=my_env
+                )
+                if completed.returncode != 0:
+                    with refresh_lock:
+                        refresh_last_error = f'main_trend.py exited with code {completed.returncode}'
             except Exception as e:
                 print('Error running main_trend.py:', e)
+                with refresh_lock:
+                    refresh_last_error = str(e)
+            finally:
+                with refresh_lock:
+                    refresh_running = False
+                    refresh_finished_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        t = threading.Thread(target=run_main, daemon=True)
-        t.start()
-        result['message'] = 'started background run of main_trend.py'
+        with refresh_lock:
+            global refresh_running, refresh_started_at, refresh_finished_at, refresh_last_error
+            if refresh_running:
+                result['triggered_run'] = False
+                result['message'] = 'main_trend.py is already running'
+            else:
+                refresh_running = True
+                refresh_started_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                refresh_finished_at = None
+                refresh_last_error = ''
+                t = threading.Thread(target=run_main, daemon=True)
+                t.start()
+                result['message'] = 'started background run of main_trend.py'
 
     # Return latest data if available
     try:
@@ -149,6 +176,19 @@ def api_refresh():
         result['error'] = str(e)
 
     return jsonify(result)
+
+
+@app.route('/api/refresh/status')
+@rate_limit(max_requests=30, window=60)
+def api_refresh_status():
+    with refresh_lock:
+        return jsonify({
+            'ok': True,
+            'running': refresh_running,
+            'started_at': refresh_started_at,
+            'finished_at': refresh_finished_at,
+            'last_error': refresh_last_error,
+        })
 
 
 if __name__ == '__main__':
