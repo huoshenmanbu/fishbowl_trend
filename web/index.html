@@ -239,6 +239,12 @@
       font-weight: 700;
     }
 
+    .turning-col {
+      white-space: nowrap;
+      min-width: 52px;
+      font-weight: 700;
+    }
+
     /* Loading 动画 */
     .loader {
       display: inline-block;
@@ -535,11 +541,11 @@
             <th>代码</th>
             <th>名称</th>
             <th>状态</th>
+            <th>拐点</th>
             <th>涨幅%</th>
             <th>现价</th>
             <th>临界点</th>
             <th>偏离率</th>
-            <th>MA5/MA10</th>
             <th class="hide-mobile">状态转变</th>
             <th class="hide-mobile">区间涨幅%</th>
           </tr>
@@ -607,11 +613,11 @@
           <td class="code">${escapeHtml(r.index_code ?? '')}</td>
           <td class="name" title="${escapeHtml(r.index_name ?? '')}">${escapeHtml(r.index_name ?? '')}</td>
           <td class="status-col ${r.status==='YES'?'yes':'no'}">${escapeHtml(r.status ?? '')}</td>
+          <td class="num-col turning-col ${crossClass}">${escapeHtml(sig)}</td>
           <td class="num-col ${priceClass}">${priceSign}${(r.price_change_pct!=null? r.price_change_pct.toFixed(2): '')}%</td>
           <td class="num-col">${(r.current_price!=null? r.current_price.toFixed(2): '')}</td>
           <td class="num-col">${(r.threshold!=null? r.threshold.toFixed(2): '')}</td>
           <td class="num-col">${(r.deviation_rate!=null? r.deviation_rate.toFixed(2): '')}%</td>
-          <td class="num-col ${crossClass}">${escapeHtml(sig)}</td>
           <td class="hide-mobile">${escapeHtml(r.status_change_time || '')}</td>
           <td class="hide-mobile num-col ${intervalClass}">${intervalSign}${(r.interval_change_pct!=null? r.interval_change_pct.toFixed(2): '')}%</td>
         `;
